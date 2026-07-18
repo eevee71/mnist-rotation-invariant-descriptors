@@ -1,6 +1,4 @@
 from data.dataloader import load_MNIST
-from src.visualization import visualize_base_representation
-
 
 def main():
     data, targets = load_MNIST()

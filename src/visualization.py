@@ -1,8 +1,8 @@
-from src.invariants import prepare_density_center, align_coordinates, covariance_invariants, normalization, gaussian_polynomial_moments, reconstruct_images
-
+from src import invariants as inv
 import torch
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
+from data.dataloader import load_MNIST
 
 def visualize_base_representation(image, label):
 
@@ -22,14 +22,14 @@ def interpolate_and_visualize(img1, img2, steps=20, max_degree=8, spatial_dims=2
     batch = torch.stack([img1, img2]) # Shape: (2, H, W)
     original_sums = batch.sum(dim=(-2, -1)) # Shape: (2,)
     
-    density_map, x_centered, y_centered = prepare_density_center(batch)
-    x_aligned, y_aligned = align_coordinates(density_map, x_centered, y_centered)
-    invariants = covariance_invariants(density_map, x_aligned, y_aligned)
+    density_map, x_centered, y_centered = inv.prepare_density_center(batch)
+    x_aligned, y_aligned = inv.align_coordinates(density_map, x_centered, y_centered)
+    invariants = inv.covariance_invariants(density_map, x_aligned, y_aligned)
     
     trace = invariants[:, 0] # Shape: (2,)
     
-    x_norm_aligned, y_norm_aligned = normalization(x_aligned, y_aligned, trace, spatial_dims)
-    features = gaussian_polynomial_moments(density_map, x_norm_aligned, y_norm_aligned, max_degree)
+    x_norm_aligned, y_norm_aligned = inv.normalization(x_aligned, y_aligned, trace, spatial_dims)
+    features = inv.gaussian_polynomial_moments(density_map, x_norm_aligned, y_norm_aligned, max_degree)
     
     alphas = torch.linspace(0, 1, steps)
     
@@ -41,9 +41,9 @@ def interpolate_and_visualize(img1, img2, steps=20, max_degree=8, spatial_dims=2
     interp_xc = (1 - alphas[:, None, None]) * x_centered[0] + alphas[:, None, None] * x_centered[1]
     interp_yc = (1 - alphas[:, None, None]) * y_centered[0] + alphas[:, None, None] * y_centered[1]
     
-    interp_x_norm, interp_y_norm = normalization(interp_xc, interp_yc, interp_trace, spatial_dims)
+    interp_x_norm, interp_y_norm = inv.normalization(interp_xc, interp_yc, interp_trace, spatial_dims)
     
-    reconstructed = reconstruct_images(
+    reconstructed = inv.reconstruct_images(
         features=interp_features,
         x_norm=interp_x_norm,
         y_norm=interp_y_norm,
@@ -94,7 +94,6 @@ def interpolate_and_visualize(img1, img2, steps=20, max_degree=8, spatial_dims=2
 
 
 if __name__ == "__main__":
-    from data.dataloader import load_MNIST
     train_data, train_targets = load_MNIST()
     img_A = train_data[0] 
     img_B = train_data[1] 

@@ -1,9 +1,8 @@
-from data.dataloader import load_MNIST
-import matplotlib.pyplot as plt
 import torch
 from torchvision.transforms.functional import rotate
+from data.dataloader import load_MNIST
 
-MAX_POLYNOMIAL_DEGREE = 8
+MAX_POLYNOMIAL_DEGREE = 6
 SPATIAL_DIMENSIONS = 2
 
 def prepare_density_center(images):
@@ -80,6 +79,80 @@ def gaussian_polynomial_moments(density_map, x_norm, y_norm, max_degree):
     return torch.stack(features, dim=-1) # shape (B, K)
 
 
+def gaussian_polynomial_moment_matrix(density_map, x_norm, y_norm, max_degree):
+    """Same as gaussian_polynomial_moments but returns a square matrix"""
+
+    f_x = get_1d_basis(x_norm, max_degree)     # shape (max_degree+1, B, H, W)
+    f_y = get_1d_basis(y_norm, max_degree)
+
+    d, B = max_degree, density_map.shape[0]
+    U = torch.zeros(B, d + 1, d + 1)
+
+    for j1 in range(d + 1):
+        for j2 in range(d + 1):
+
+            if j1 + j2 <= d:    # rest is 0 -> degree <= d
+                U[:, j1, j2] = (density_map * f_x[j1] * f_y[j2]).sum(dim=(-2, -1))
+
+    return U    #(B, d+1, d+1)
+
+
+def hermite_to_monomial_matrix(max_degree):
+    """T[n, m] = N_n * (coeff of x^m in H_n), same norm as get_1d_basis."""
+
+    d = max_degree
+    h = torch.zeros(d + 1, d + 1)   # h[n, m] = coeff x^m in H_n
+    h[0, 0] = 1.0
+
+    if d >= 1:
+        h[1, 1] = 2.0
+
+    for n in range(2, d + 1):   # H_n = 2x H_{n-1} - 2(n-1) H_{n-2}
+        h[n, 1:] += 2.0 * h[n - 1, :-1]     # *2x
+        h[n, :]  -= 2.0 * (n - 1) * h[n - 2, :]
+
+    fact = 1.0
+    N = torch.zeros(d + 1)
+    pi_sqrt = torch.pi ** 0.5
+
+    for n in range(d + 1):
+        N[n] = 1.0 / ((2 ** n * fact * pi_sqrt) ** 0.5)
+        fact *= (n + 1)
+
+    return N.view(-1, 1) * h    # (d+1, d+1)
+
+
+def homogeneous_coefficients(U, T, max_degree):
+    """Returns c_{ijk} where (i+j+k=d) with shape (B, K) + list of indices (i, j, k)"""
+
+    A = torch.einsum('im,bij,jn->bmn', T, U, T)  # change basis A[b,i,j] = coeff for x^i y^j
+    d = max_degree
+
+    coeffs, index = [], []
+
+    for i in range(d + 1):
+        for j in range(d + 1):
+
+            if i + j <= d:
+                coeffs.append(A[:, i, j])
+                index.append((i, j, d - i - j))
+    return torch.stack(coeffs, dim=-1), index    #(B, K)
+
+#test
+data, targets = load_MNIST()
+
+density_map, x_centered, y_centered = prepare_density_center(data)
+invariants = covariance_invariants(density_map, x_centered, y_centered)
+x_norm, y_norm = normalization(x_centered, y_centered, invariants[:, 0], SPATIAL_DIMENSIONS)
+
+U = gaussian_polynomial_moment_matrix(density_map, x_norm, y_norm, MAX_POLYNOMIAL_DEGREE)
+T = hermite_to_monomial_matrix(MAX_POLYNOMIAL_DEGREE)
+coeffs, index = homogeneous_coefficients(U, T, MAX_POLYNOMIAL_DEGREE)
+print(coeffs[0], index)
+
+
+#=================================================================
+#image rotation -> without using invariants
 def align_coordinates(density_map, x, y):
     
     # This probably should be combined with covariance_invariants()
@@ -135,67 +208,3 @@ def reconstruct_images(features, x_norm, y_norm, max_degree, original_sum, trace
     reconstruction = torch.clamp(reconstruction * original_sum.view(-1, 1, 1), 0, 1)
     return rotate(reconstruction, angle=-90) # This is a little stupid but otherwise the digits are sideways
 
-
-if __name__ == "__main__":
-
-    from torchvision.transforms import InterpolationMode
-    from torchvision.transforms.functional import affine
-
-    data, targets = load_MNIST()
-    data, targets = data[4:6], targets[4:6]
-
-    data[1] = affine(
-        data[0].unsqueeze(0), 
-        angle=45, 
-        translate=[5, 2],
-        scale=0.8,
-        shear=0.0,         # skewing
-        interpolation=InterpolationMode.BILINEAR
-    ).squeeze(0)
-    targets[1] = targets[0]
-
-    # Main pipeline
-    density_map, x_centered, y_centered = prepare_density_center(data)
-    x_aligned, y_aligned = align_coordinates(density_map, x_centered, y_centered)
-    invariants = covariance_invariants(density_map, x_aligned, y_aligned)
-    x_norm_aligned, y_norm_aligned = normalization(x_aligned, y_aligned, invariants[:, 0], SPATIAL_DIMENSIONS)
-    final_representations = gaussian_polynomial_moments(density_map, x_norm_aligned, y_norm_aligned, MAX_POLYNOMIAL_DEGREE)
-
-    # For reconstruction
-    original_sums = data.sum(dim=(-2, -1))
-    shared_trace = invariants[:, 0].mean(dim=0, keepdim=True).expand_as(invariants[:, 0])
-    shared_sum = original_sums.mean(dim=0, keepdim=True).expand_as(original_sums)
-    shared_x_centered = x_centered.mean(dim=0, keepdim=True).expand_as(x_centered)
-    shared_y_centered = y_centered.mean(dim=0, keepdim=True).expand_as(y_centered)
-
-    x_norm_straight, y_norm_straight = normalization(shared_x_centered, shared_y_centered, shared_trace, SPATIAL_DIMENSIONS)
-
-    # print(final_representations.shape)
-    # print(final_representations[0])
-
-    reconstructed_data = reconstruct_images(
-        features=final_representations, 
-        x_norm=x_norm_straight, 
-        y_norm=y_norm_straight, 
-        max_degree=MAX_POLYNOMIAL_DEGREE, 
-        original_sum=shared_sum,
-        trace=shared_trace,
-        d=SPATIAL_DIMENSIONS
-    )
-
-    print("Reconstructed images shape:", reconstructed_data.shape)
-
-    orig_0 = data[0].squeeze(0)
-    recon_0 = reconstructed_data[0].squeeze(0)
-    comparison_0 = torch.cat([orig_0, recon_0], dim=-1)  # Stitch side-by-side
-
-    orig_1 = data[1].squeeze(0)
-    recon_1 = reconstructed_data[1].squeeze(0)
-    comparison_1 = torch.cat([orig_1, recon_1], dim=-1)  # Stitch side-by-side
-
-    final_comparison = torch.cat([comparison_0, comparison_1], dim=0)
-
-    plt.imshow(final_comparison, cmap='gray')
-    plt.title("Top: Upright (Original / Reconstructed)\nBottom: Transformed (Original / Reconstructed)")
-    plt.axis('off')
-    plt.show()
