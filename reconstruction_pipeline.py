@@ -3,10 +3,11 @@ from matplotlib import pyplot as plt
 from data.dataloader import load_MNIST
 from torchvision.transforms import InterpolationMode
 from torchvision.transforms.functional import affine
-from src import invariants as inv
+from src.moment_transforms import MomentTransform
 
 if __name__ == '__main__':
 
+    transform = MomentTransform()
     data, targets = load_MNIST()
     data, targets = data[4:6], targets[4:6]
 
@@ -21,12 +22,11 @@ if __name__ == '__main__':
     targets[1] = targets[0]
 
     # Main pipeline
-    density_map, x_centered, y_centered = inv.prepare_density_center(data)
-    x_aligned, y_aligned = inv.align_coordinates(density_map, x_centered, y_centered)
-    invariants = inv.covariance_invariants(density_map, x_aligned, y_aligned)
-    x_norm_aligned, y_norm_aligned = inv.normalization(x_aligned, y_aligned, invariants[:, 0], inv.SPATIAL_DIMENSIONS)
-    final_representations = inv.gaussian_polynomial_moments(density_map, x_norm_aligned, y_norm_aligned,
-                                                        inv.MAX_POLYNOMIAL_DEGREE)
+    density_map, x_centered, y_centered = transform.prepare_density_center(data)
+    x_aligned, y_aligned = transform.align_coordinates(density_map, x_centered, y_centered)
+    invariants = transform.covariance_invariants(density_map, x_aligned, y_aligned)
+    x_norm_aligned, y_norm_aligned = transform.normalization(x_aligned, y_aligned, invariants[:, 0])
+    final_representations = transform.gaussian_polynomial_moments(density_map, x_norm_aligned, y_norm_aligned)
 
     # For reconstruction
     original_sums = data.sum(dim=(-2, -1))
@@ -35,20 +35,17 @@ if __name__ == '__main__':
     shared_x_centered = x_centered.mean(dim=0, keepdim=True).expand_as(x_centered)
     shared_y_centered = y_centered.mean(dim=0, keepdim=True).expand_as(y_centered)
 
-    x_norm_straight, y_norm_straight = inv.normalization(shared_x_centered, shared_y_centered, shared_trace,
-                                                     inv.SPATIAL_DIMENSIONS)
+    x_norm_straight, y_norm_straight = transform.normalization(shared_x_centered, shared_y_centered, shared_trace)
 
     # print(final_representations.shape)
     # print(final_representations[0])
 
-    reconstructed_data = inv.reconstruct_images(
+    reconstructed_data = transform.reconstruct_images(
         features=final_representations,
         x_norm=x_norm_straight,
         y_norm=y_norm_straight,
-        max_degree=inv.MAX_POLYNOMIAL_DEGREE,
         original_sum=shared_sum,
-        trace=shared_trace,
-        d=inv.SPATIAL_DIMENSIONS
+        trace=shared_trace
     )
 
     print("Reconstructed images shape:", reconstructed_data.shape)

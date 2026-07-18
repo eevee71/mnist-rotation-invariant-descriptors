@@ -1,4 +1,4 @@
-from src import invariants as inv
+from src.moment_transforms import MomentTransform
 import torch
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
@@ -18,18 +18,19 @@ def interpolate_and_visualize(img1, img2, steps=20, max_degree=8, spatial_dims=2
     between them in the latent space, and plots the reconstruction with a slider.
     Displays Image A on the left, interpolation in the middle, and Image B on the right.
     """
-    
+
+    transform = MomentTransform(max_degree=max_degree, spatial_dimensions=spatial_dims)
     batch = torch.stack([img1, img2]) # Shape: (2, H, W)
     original_sums = batch.sum(dim=(-2, -1)) # Shape: (2,)
     
-    density_map, x_centered, y_centered = inv.prepare_density_center(batch)
-    x_aligned, y_aligned = inv.align_coordinates(density_map, x_centered, y_centered)
-    invariants = inv.covariance_invariants(density_map, x_aligned, y_aligned)
+    density_map, x_centered, y_centered = transform.prepare_density_center(batch)
+    x_aligned, y_aligned = transform.align_coordinates(density_map, x_centered, y_centered)
+    invariants = transform.covariance_invariants(density_map, x_aligned, y_aligned)
     
     trace = invariants[:, 0] # Shape: (2,)
     
-    x_norm_aligned, y_norm_aligned = inv.normalization(x_aligned, y_aligned, trace, spatial_dims)
-    features = inv.gaussian_polynomial_moments(density_map, x_norm_aligned, y_norm_aligned, max_degree)
+    x_norm_aligned, y_norm_aligned = transform.normalization(x_aligned, y_aligned, trace)
+    features = transform.gaussian_polynomial_moments(density_map, x_norm_aligned, y_norm_aligned)
     
     alphas = torch.linspace(0, 1, steps)
     
@@ -41,16 +42,14 @@ def interpolate_and_visualize(img1, img2, steps=20, max_degree=8, spatial_dims=2
     interp_xc = (1 - alphas[:, None, None]) * x_centered[0] + alphas[:, None, None] * x_centered[1]
     interp_yc = (1 - alphas[:, None, None]) * y_centered[0] + alphas[:, None, None] * y_centered[1]
     
-    interp_x_norm, interp_y_norm = inv.normalization(interp_xc, interp_yc, interp_trace, spatial_dims)
+    interp_x_norm, interp_y_norm = transform.normalization(interp_xc, interp_yc, interp_trace)
     
-    reconstructed = inv.reconstruct_images(
+    reconstructed = transform.reconstruct_images(
         features=interp_features,
         x_norm=interp_x_norm,
         y_norm=interp_y_norm,
-        max_degree=max_degree,
         original_sum=interp_sums,
         trace=interp_trace,
-        d=spatial_dims
     )
     
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 4.5))
