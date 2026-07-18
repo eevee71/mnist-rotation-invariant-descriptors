@@ -1,4 +1,4 @@
-from src.moment_transforms import MomentTransform
+from src.moment_transforms import MomentTransform, align_coordinates
 import torch
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
@@ -24,7 +24,7 @@ def interpolate_and_visualize(img1, img2, steps=20, max_degree=8, spatial_dims=2
     original_sums = batch.sum(dim=(-2, -1)) # Shape: (2,)
     
     density_map, x_centered, y_centered = transform.prepare_density_center(batch)
-    x_aligned, y_aligned = transform.align_coordinates(density_map, x_centered, y_centered)
+    x_aligned, y_aligned = align_coordinates(density_map, x_centered, y_centered)
     invariants = transform.covariance_invariants(density_map, x_aligned, y_aligned)
     
     trace = invariants[:, 0] # Shape: (2,)

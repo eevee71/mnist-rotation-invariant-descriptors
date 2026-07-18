@@ -1,18 +1,32 @@
 from data.dataloader import load_MNIST
-from src.moment_transforms import MomentTransform
+import src.compare as cmp
+
+DEGREE = 9
+N_CLUSTERS = 9
+EVAL_N = None
+
 
 def main():
-    data, targets = load_MNIST()
-    mt = MomentTransform()
-    # test
-    density_map, x_centered, y_centered = mt.prepare_density_center(data)
-    invariants = mt.covariance_invariants(density_map, x_centered, y_centered)
-    x_norm, y_norm = mt.normalization(x_centered, y_centered, invariants[:, 0])
 
-    U = mt.gaussian_polynomial_moment_matrix(density_map, x_norm, y_norm)
-    T = mt.hermite_to_monomial_matrix()
-    coeffs, index = mt.homogeneous_coefficients(U, T)
-    print(coeffs[0], index[0], coeffs.shape)
+    data, targets = load_MNIST()
+
+    # is the class signal present in the invariants
+    print("feature ceiling (supervised)")
+    cmp.feature_ceiling(data, targets, degree=DEGREE, K=N_CLUSTERS, eval_n=EVAL_N)
+
+    # block whitening (non-diagonal) + chirality weighting
+    print("\nblock whitening (unsupervised)")
+    cmp.print_compare(cmp.compare_blockwhiten(
+        data, targets, degree=DEGREE, K=N_CLUSTERS,eval_n=EVAL_N))
+
+    # LDA
+    print("\nLDA discriminative subspace")
+    cmp.print_compare(cmp.compare_supervised_projection(
+        data, targets, degree=DEGREE, K=N_CLUSTERS, eval_n=EVAL_N))
+
+    cmp.print_compare(cmp.compare_supervised_projection(
+        data, targets, degree=9, K=9, use_chirality=False))  # no chi
+
 
 if __name__ == '__main__':
     main()

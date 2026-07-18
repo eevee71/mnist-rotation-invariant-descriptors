@@ -5,8 +5,10 @@ from torchvision.transforms.functional import rotate
 class MomentTransform:
 
     def __init__(self, max_degree=6, spatial_dimensions=2):
+
         self.max_degree = max_degree
         self.spatial_dimensions = spatial_dimensions
+
 
     def prepare_density_center(self, images):
 
@@ -142,36 +144,6 @@ class MomentTransform:
         return torch.stack(coeffs, dim=-1), index  # (B, K)
 
 
-    # image rotation -> without using invariants
-    def align_coordinates(self, density_map, x, y):
-
-        # This probably should be combined with covariance_invariants()
-        p_xx = (density_map * x * x).sum(dim=(-2, -1))  # shape (B,)
-        p_yy = (density_map * y * y).sum(dim=(-2, -1))  # shape (B,)
-        p_xy = (density_map * x * y).sum(dim=(-2, -1))  # shape (B,)
-
-        # Theta = angle of the principal axis (ellipsoid approximation)
-        theta = 0.5 * torch.atan2(2 * p_xy, p_xx - p_yy)  # shape (B,)
-        theta = theta.view(-1, 1, 1)  # shape (B, 1, 1)
-
-        cos_t = torch.cos(theta)  # shape (B, 1, 1)
-        sin_t = torch.sin(theta)  # shape (B, 1, 1)
-
-        x_rotated = x * cos_t + y * sin_t  # shape (B, H, W)
-        y_rotated = -x * sin_t + y * cos_t  # shape (B, H, W)
-
-        # 180 degree ambiguity fix (which side holds more mass)
-        skew_x = (density_map * (x_rotated ** 3)).sum(dim=(-2, -1), keepdim=True)  # shape (B, 1, 1)
-
-        flip_mask = torch.sign(skew_x)  # shape (B, 1, 1)
-        flip_mask[flip_mask == 0] = 1  # shape (B, 1, 1)
-
-        x_rotated = x_rotated * flip_mask  # shape (B, H, W)
-        y_rotated = y_rotated * flip_mask  # shape (B, H, W)
-
-        return x_rotated, y_rotated
-
-
     def reconstruct_images(self, features, x_norm, y_norm, original_sum, trace):
         """
         Reconstructs the original images from their Gaussian-Hermite moments,
@@ -197,3 +169,33 @@ class MomentTransform:
         reconstruction = reconstruction / scale_sq  # shape (B, H, W)
         reconstruction = torch.clamp(reconstruction * original_sum.view(-1, 1, 1), 0, 1)
         return rotate(reconstruction, angle=-90)  # This is a little stupid but otherwise the digits are sideways
+
+
+# image rotation -> without using invariants
+def align_coordinates(density_map, x, y):
+
+    # This probably should be combined with covariance_invariants()
+    p_xx = (density_map * x * x).sum(dim=(-2, -1))  # shape (B,)
+    p_yy = (density_map * y * y).sum(dim=(-2, -1))  # shape (B,)
+    p_xy = (density_map * x * y).sum(dim=(-2, -1))  # shape (B,)
+
+    # Theta = angle of the principal axis (ellipsoid approximation)
+    theta = 0.5 * torch.atan2(2 * p_xy, p_xx - p_yy)  # shape (B,)
+    theta = theta.view(-1, 1, 1)  # shape (B, 1, 1)
+
+    cos_t = torch.cos(theta)  # shape (B, 1, 1)
+    sin_t = torch.sin(theta)  # shape (B, 1, 1)
+
+    x_rotated = x * cos_t + y * sin_t  # shape (B, H, W)
+    y_rotated = -x * sin_t + y * cos_t  # shape (B, H, W)
+
+    # 180 degree ambiguity fix (which side holds more mass)
+    skew_x = (density_map * (x_rotated ** 3)).sum(dim=(-2, -1), keepdim=True)  # shape (B, 1, 1)
+
+    flip_mask = torch.sign(skew_x)  # shape (B, 1, 1)
+    flip_mask[flip_mask == 0] = 1  # shape (B, 1, 1)
+
+    x_rotated = x_rotated * flip_mask  # shape (B, H, W)
+    y_rotated = y_rotated * flip_mask  # shape (B, H, W)
+
+    return x_rotated, y_rotated

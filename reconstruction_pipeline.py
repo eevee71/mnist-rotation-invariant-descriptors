@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 from data.dataloader import load_MNIST
 from torchvision.transforms import InterpolationMode
 from torchvision.transforms.functional import affine
-from src.moment_transforms import MomentTransform
+from src.moment_transforms import MomentTransform, align_coordinates
 
 if __name__ == '__main__':
 
@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
     # Main pipeline
     density_map, x_centered, y_centered = transform.prepare_density_center(data)
-    x_aligned, y_aligned = transform.align_coordinates(density_map, x_centered, y_centered)
+    x_aligned, y_aligned = align_coordinates(density_map, x_centered, y_centered)
     invariants = transform.covariance_invariants(density_map, x_aligned, y_aligned)
     x_norm_aligned, y_norm_aligned = transform.normalization(x_aligned, y_aligned, invariants[:, 0])
     final_representations = transform.gaussian_polynomial_moments(density_map, x_norm_aligned, y_norm_aligned)
