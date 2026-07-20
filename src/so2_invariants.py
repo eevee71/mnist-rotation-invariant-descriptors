@@ -3,35 +3,34 @@ from math import comb
 from collections import defaultdict
 
 
-def _T(i, j, a):
-    """Exact coeff of u^a ubar^b (u=x+iy, b=i+j-a) inside x^i y^j"""
+def _monomial_to_z_coeff(x_pow, y_pow, z_pow):
+    """Calculates the transition coefficient to the complex basis"""
 
-    s = 0j
-    for p in range(max(0, a - j), min(i, a) + 1):
-        s += comb(i, p) * comb(j, a - p) * ((-1) ** (j - a + p))
+    coeff = 0j
+    for p in range(max(0, z_pow - y_pow), min(x_pow, z_pow) + 1):
+        coeff += comb(x_pow, p) * comb(y_pow, z_pow - p) * ((-1) ** (y_pow - z_pow + p))
 
-    return s * (2.0 ** (-(i + j))) * (1j ** (-j))
+    return coeff * (2.0 ** (-(x_pow + y_pow))) * (1j ** (-y_pow))
 
 
 class SO2Invariants:
 
     def __init__(self, index, degree=6, ref=None, dtype=torch.float64):
 
-        self.d = degree
+        self.degree = degree
         self.dtype = dtype
         self.cdtype = torch.complex128 if dtype == torch.float64 else torch.complex64
-        self.col = {tuple(t): p for p, t in enumerate(index)}   # (i,j,k) -> column
-        K = len(index)
-        self.K = K
+        self.col = {tuple(t): p for p, t in enumerate(index)}   # (x_pow,y_pow,z_pow) -> column in the input coefficient matrix
+        self.n_monomials = len(index)
 
         rows, amp_km = [], []
         for k in range(degree + 1):
             n = degree - k
             for m in range(n, -1, -2):  # frequencies present in this block
                 a = (n + m) // 2
-                row = torch.zeros(K, dtype=self.cdtype)
+                row = torch.zeros(self.n_monomials, dtype=self.cdtype)
                 for i in range(n + 1):
-                    row[self.col[(i, n - i, k)]] = complex(_T(i, n - i, a))
+                    row[self.col[(i, n - i, k)]] = complex(_monomial_to_z_coeff(i, n - i, a))
                 rows.append(row)
                 amp_km.append((k, m))
         self.amp_coeff = torch.stack(rows)  # (n_amp_all, K) complex
@@ -68,7 +67,6 @@ class SO2Invariants:
 
 
     def __call__(self, coeffs):
-        """coeffs (B, K) real -> (B, 38) invariant features"""
 
         Z = self.amplitudes(coeffs) # (B, n_amp_all)
         lin = Z[:, self.lin_idx].real   # (B, 4)
