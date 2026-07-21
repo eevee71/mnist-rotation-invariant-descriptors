@@ -1,4 +1,4 @@
-from data.dataloader import load_MNIST
+from data.dataloader import load_MNIST, augment_with_rotations
 import src.compare as cmp
 
 DEGREE = 9
@@ -8,7 +8,7 @@ EVAL_N = None
 
 def main():
 
-    data, targets = load_MNIST()
+    data, targets = load_MNIST(transform=augment_with_rotations)
 
     # is the class signal present in the invariants
     print("feature ceiling (supervised)")

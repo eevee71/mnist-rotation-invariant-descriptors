@@ -4,7 +4,7 @@ extracts its Gaussian-Hermite moments and reconstructs it to verify the captured
 
 import torch
 from matplotlib import pyplot as plt
-from data.dataloader import load_MNIST
+from data.dataloader import load_MNIST, augment_with_rotations
 from src.moment_transforms import MomentTransform
 
 
@@ -68,6 +68,6 @@ def run_reconstruct_pipeline(single_image):
 
 if __name__ == "__main__":
     transform = MomentTransform()
-    all_data, _ = load_MNIST()
-    img = all_data[5].squeeze(0)
+    all_data, _ = load_MNIST(transform=augment_with_rotations)
+    img = all_data[2137].squeeze(0)
     run_reconstruct_pipeline(img)
