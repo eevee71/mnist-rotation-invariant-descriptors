@@ -5,6 +5,7 @@ import torchvision.transforms.v2.functional as TVF
 
 
 def load_MNIST(train=True, transform=None):
+    """Downloads and loads the MNIST dataset as float Tensors normalized to [0, 1]."""
 
     project_root = Path(__file__).resolve().parents[1]
     data_dir = project_root / "data"
@@ -19,6 +20,18 @@ def load_MNIST(train=True, transform=None):
     print(f"data: {data.shape}")
     print(f"targets {targets.shape}")
     return data, targets
+
+def load_data(full_dataset=True, seed=0):
+    """Wrapper function, loads both train and test sets combined into one Tensor if full_dataset=True.
+    """
+    if full_dataset:
+        data_tr, targets_tr = load_MNIST(train=True)
+        data_te, targets_te = load_MNIST(train=False)
+        data = torch.cat([data_tr, data_te], dim=0)
+        targets = torch.cat([targets_tr, targets_te], dim=0)
+        return data, targets
+    else:
+        return load_MNIST(train=True)
 
 
 def rotate_dataset(data, targets, max_angle=180, seed=None):
@@ -41,6 +54,17 @@ def rotate_dataset(data, targets, max_angle=180, seed=None):
 
     return rotated_data, targets
 
+def flip_dataset(data, targets, mode='horizontal'):
+    """Flips image tensors horizontally or vertically."""
+
+    if mode == 'horizontal':
+        flipped = TVF.hflip(data)
+    elif mode == 'vertical':
+        flipped = TVF.vflip(data)
+    else:
+        raise ValueError("Mode must be either 'horizontal' or 'vertical'.")
+
+    return flipped, targets
 
 def flip_dataset(data, targets, mode='horizontal'):
     """Flips image tensors."""

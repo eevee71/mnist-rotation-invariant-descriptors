@@ -1,39 +1,36 @@
-import torch
-
-from data.dataloader import load_MNIST, rotate_dataset
-import src.compare as cmp
+from data.dataloader import load_data
 from models.mlp import train_mlp
-
-DEGREE = 9
-N_CLUSTERS = 9
-EVAL_N = None
-
+from src.experiments.clustering import compare_methods, compare_blockwhiten
+from src.experiments.supervised import feature_ceiling, compare_supervised_projection
+from src.experiments.sweep import run_sweep
+from src.experiments.utils import print_compare
 
 def main():
-    """
-    data, targets = load_MNIST(train=True, transform=None)
+    print("=== Loading Dataset ===")
+    data, targets = load_data(full_dataset=True)
 
-    # is the class signal present in the invariants
-    print("feature ceiling (supervised)")
-    cmp.feature_ceiling(data, targets, degree=DEGREE, K=N_CLUSTERS, eval_n=EVAL_N)
+    print("\n=== Supervised Benchmarks (Feature Ceiling) ===")
+    feature_ceiling(data, targets, degree=9, K=9)
 
-    # block whitening (non-diagonal) + chirality weighting
-    print("\nblock whitening (unsupervised)")
-    cmp.print_compare(cmp.compare_blockwhiten(
-        data, targets, degree=DEGREE, K=N_CLUSTERS,eval_n=EVAL_N))
+    print("\n=== Unsupervised Clustering Comparison ===")
+    clustering_results = compare_methods(data, targets, degree=9, K=9, eval_n=5000)
+    print_compare(clustering_results)
 
-    # LDA (QDA)
-    print("\nLDA discriminative subspace")
-    cmp.print_compare(cmp.compare_supervised_projection(
-        data, targets, degree=DEGREE, K=N_CLUSTERS, eval_n=EVAL_N))
+    print("\n=== Block Whitening Comparison ===")
+    blockwhiten_results = compare_blockwhiten(data, targets, degree=9, K=9, eval_n=5000)
+    print_compare(blockwhiten_results)
 
-    cmp.print_compare(cmp.compare_supervised_projection(
-        data, targets, degree=9, K=9, use_chirality=False))  # no chi
-    """
-    # MLP
-    train_data, train_targets = load_MNIST()
-    train_mlp(train_data, train_targets, degree=9, K=9, use_chirality=True)
+    print("\n=== Supervised Projection (LDA Subspace) ===")
+    lda_results = compare_supervised_projection(data, targets, degree=9, K=9)
+    print_compare(lda_results)
 
+    print("\n=== Training Invariant MLP Classifier ===")
+    train_mlp(data, targets, degree=9, K=9, epochs=30)
 
-if __name__ == '__main__':
+#parameter grid search
+# print("\n=== 7. Running Parameter Sweep (Grid Search) ===")
+# sweep_results = run_sweep(data, targets, degrees=range(6, 10))
+# print_report(sweep_results)
+
+if __name__ == "__main__":
     main()
