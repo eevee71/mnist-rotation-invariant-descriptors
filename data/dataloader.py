@@ -24,6 +24,7 @@ def load_MNIST(train=True, transform=None):
 def load_data(full_dataset=True, seed=0):
     """Wrapper function, loads both train and test sets combined into one Tensor if full_dataset=True.
     """
+
     if full_dataset:
         data_tr, targets_tr = load_MNIST(train=True)
         data_te, targets_te = load_MNIST(train=False)

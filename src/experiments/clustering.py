@@ -4,6 +4,8 @@ from sklearn.mixture import GaussianMixture
 from src.pipeline import prepare_pipeline
 from src.whitening import BlockWhitener
 from src.experiments.utils import _score
+from src.visualization import visualize_cluster_prototypes
+from sklearn.cluster import KMeans
 
 
 def compare_methods(data, targets, degree=9, K=9, alpha=0.8, var_keep=0.99, eval_n=None, seed=0):
@@ -43,3 +45,23 @@ def compare_blockwhiten(data, targets, degree=9, K=9, chiral_weights=(0.0, 0.3, 
         out[f"GMM   blockwhiten (chi_w={w})"] = _score(yte, gmm.fit_predict(Xte_w))
 
     return out
+
+
+def run_and_plot_best_clustering(data, targets, degree=9, K=9, save_path="results/cluster_prototypes.png"):
+    """
+    Helper function to run KMeans and plot cluster prototypes directly from the clustering module.
+    """
+
+    Xtr, _, _, _, _ = prepare_pipeline(data, targets, degree=degree, K=K, seed=0)
+
+    kmeans = KMeans(n_clusters=K, random_state=0, n_init='auto')
+    kmeans.fit(Xtr)
+
+    visualize_cluster_prototypes(
+        X=Xtr,
+        raw_images=data,
+        true_labels=targets,
+        kmeans_model=kmeans,
+        title=f"KMeans Cluster Prototypes (Degree={degree}, K={K})",
+        save_path=save_path
+    )
