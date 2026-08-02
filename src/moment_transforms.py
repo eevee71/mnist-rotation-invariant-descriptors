@@ -1,144 +1,91 @@
+import math
 import torch
-from torchvision.transforms.functional import rotate
 
 
 class MomentTransform:
 
     def __init__(self, max_degree=6, spatial_dimensions=2):
-
         self.max_degree = max_degree
         self.spatial_dimensions = spatial_dimensions
 
-
     def prepare_density_center(self, images):
-
-        normalized = images / (images.sum(dim=(-2, -1), keepdim=True) + 1e-9)  # shape (B, H, W)
+        normalized = images / (images.sum(dim=(-2, -1), keepdim=True) + 1e-9)
 
         rows, cols = images.shape[-2], images.shape[-1]
-        y_grid, x_grid = torch.meshgrid(torch.arange(rows), torch.arange(cols), indexing='ij')  # shapes (H, W)
+        y_grid, x_grid = torch.meshgrid(
+            torch.arange(rows, device=images.device),
+            torch.arange(cols, device=images.device),
+            indexing='ij',
+        )
         x_grid = x_grid.float()
         y_grid = y_grid.float()
-        x_centered = x_grid - (normalized * x_grid).sum(dim=(-2, -1), keepdim=True)  # x - mean_x
-        y_centered = y_grid - (normalized * y_grid).sum(dim=(-2, -1), keepdim=True)  # shape (B, H, W)
+
+        x_centered = x_grid - (normalized * x_grid).sum(dim=(-2, -1), keepdim=True)
+        y_centered = y_grid - (normalized * y_grid).sum(dim=(-2, -1), keepdim=True)
 
         return normalized, x_centered, y_centered
 
-
     def covariance_invariants(self, density_map, x, y):
+        p_xx = (density_map * x * x).sum(dim=(-2, -1))
+        p_yy = (density_map * y * y).sum(dim=(-2, -1))
+        p_xy = (density_map * x * y).sum(dim=(-2, -1))
 
-        p_xx = (density_map * x * x).sum(dim=(-2, -1))  # shape (B,)
-        p_yy = (density_map * y * y).sum(dim=(-2, -1))  # shape (B,)
-        p_xy = (density_map * x * y).sum(dim=(-2, -1))  # shape (B,)
+        p = torch.stack(
+            [
+                torch.stack([p_xx, p_xy], dim=-1),
+                torch.stack([p_xy, p_yy], dim=-1),
+            ],
+            dim=-2,
+        )
 
-        p = torch.stack([torch.stack([p_xx, p_xy], dim=-1),  # shape (B, 2, 2)
-                         torch.stack([p_xy, p_yy], dim=-1)], dim=-2)
+        trace_p1 = torch.diagonal(p, dim1=-2, dim2=-1).sum(dim=-1)
+        trace_p2 = torch.diagonal(torch.matmul(p, p), dim1=-2, dim2=-1).sum(dim=-1)
 
-        trace_p1 = torch.diagonal(p, dim1=-2, dim2=-1).sum(dim=-1)  # shape: (B,)
-        trace_p2 = torch.diagonal(torch.matmul(p, p), dim1=-2, dim2=-1).sum(dim=-1)  # shape: (B,)
-
-        return torch.stack([trace_p1, trace_p2], dim=-1)  # shape (B, 2)
-
+        return torch.stack([trace_p1, trace_p2], dim=-1)
 
     def normalization(self, x, y, trace):
+        scale = torch.sqrt(trace / self.spatial_dimensions).view(-1, 1, 1)
+        return x / scale, y / scale
 
-        scale = torch.sqrt(trace / self.spatial_dimensions).view(-1, 1, 1)  # shape (B, 1, 1)
-        return x / scale, y / scale  # shapes (B, H, W)
+    def complex_coefficients(self, images):
+        """Extracts complex Hermite coefficients mode-by-mode to keep memory footprint minimal."""
+        dm, xc, yc = self.prepare_density_center(images)
+        trace = self.covariance_invariants(dm, xc, yc)[:, 0]
+        xn, yn = self.normalization(xc, yc, trace)
 
+        z = torch.complex(xn, yn)
+        z_bar = torch.conj(z)
+        z_abs2 = xn**2 + yn**2
+        gaussian_window = torch.exp(-0.5 * z_abs2)
 
-    def get_1d_basis(self, coords_normalized):
-
-        basis_functions = []
-        fact = 1
-        pi_sqrt = torch.pi ** 0.5
-        gaussian_window = torch.exp(-(coords_normalized ** 2) / 2)  # shape (B, H, W)
-
-        H = [torch.ones_like(coords_normalized), 2 * coords_normalized]  # list of tensors with shape (B, H, W)
-        for j in range(2, self.max_degree + 1):
-            next = 2 * coords_normalized * H[j - 1] - 2 * (j - 1) * H[j - 2]
-            H.append(next)
-
-        for j in range(self.max_degree + 1):  # base
-            norm_factor = 1 / ((2 ** j * fact * pi_sqrt) ** 0.5)
-            f_j = norm_factor * H[j] * gaussian_window  # shape (B, H, W)
-            basis_functions.append(f_j)
-            fact *= (j + 1)
-
-        return torch.stack(basis_functions, dim=0)  # shape (max_degree+1, B, H, W)
-
-
-    def gaussian_polynomial_moments(self, density_map, x_norm, y_norm):
-
-        f_x = self.get_1d_basis(x_norm)  # shape (max_degree+1, B, H, W)
-        f_y = self.get_1d_basis(y_norm)  # shape (max_degree+1, B, H, W)
-
-        features = []
-        for j1 in range(self.max_degree + 1):
-            for j2 in range(self.max_degree + 1):
-
-                if j1 + j2 <= self.max_degree:
-                    f_product = f_x[j1] * f_y[j2]  # shape (B, H, W)
-
-                    u_j = (density_map * f_product).sum(dim=(-2, -1))  # expected value, shape (B,)
-                    features.append(u_j)
-
-        return torch.stack(features, dim=-1)  # shape (B, K)
-
-
-    def gaussian_polynomial_moment_matrix(self, density_map, x_norm, y_norm):
-        """Same as gaussian_polynomial_moments but returns a square matrix"""
-
-        f_x = self.get_1d_basis(x_norm)  # shape (max_degree+1, B, H, W)
-        f_y = self.get_1d_basis(y_norm)
-
-        d, B = self.max_degree, density_map.shape[0]
-        U = torch.zeros(B, d + 1, d + 1)
-
-        for j1 in range(d + 1):
-            for j2 in range(d + 1):
-
-                if j1 + j2 <= d:  # rest is 0 -> degree <= d
-                    U[:, j1, j2] = (density_map * f_x[j1] * f_y[j2]).sum(dim=(-2, -1))
-
-        return U  # (B, d+1, d+1)
-
-
-    def hermite_to_monomial_matrix(self):
-        """T[n, m] = N_n * (coeff of x^m in H_n), same norm as get_1d_basis."""
-
+        coeffs_list = []
+        index = []
         d = self.max_degree
-        h = torch.zeros(d + 1, d + 1)  # h[n, m] = coeff x^m in H_n
-        h[0, 0] = 1.0
-
-        if d >= 1:
-            h[1, 1] = 2.0
-
-        for n in range(2, d + 1):  # H_n = 2x H_{n-1} - 2(n-1) H_{n-2}
-            h[n, 1:] += 2.0 * h[n - 1, :-1]  # *2x
-            h[n, :] -= 2.0 * (n - 1) * h[n - 2, :]
-
-        fact = 1.0
-        N = torch.zeros(d + 1)
-        pi_sqrt = torch.pi ** 0.5
 
         for n in range(d + 1):
-            N[n] = 1.0 / ((2 ** n * fact * pi_sqrt) ** 0.5)
-            fact *= (n + 1)
+            for m in range(n + 1):
+                if n + m <= d:
+                    H_nm = torch.zeros_like(z)
+                    for k in range(min(n, m) + 1):
+                        coeff = (
+                            ((-1) ** k)
+                            * math.factorial(n)
+                            * math.factorial(m)
+                            / (math.factorial(k) * math.factorial(n - k) * math.factorial(m - k))
+                        )
+                        z_pow = z ** (n - k) if (n - k) > 0 else torch.ones_like(z)
+                        z_bar_pow = z_bar ** (m - k) if (m - k) > 0 else torch.ones_like(z)
+                        H_nm = H_nm + coeff * z_pow * z_bar_pow
 
-        return N.view(-1, 1) * h  # (d+1, d+1)
+                    norm = 1.0 / math.sqrt(
+                        math.pi * (2 ** (n + m)) * math.factorial(n) * math.factorial(m)
+                    )
+                    psi_nm = norm * H_nm * gaussian_window
 
+                    # Immediately project per mode instead of accumulating 4D basis tensors
+                    c_nm = (dm * torch.conj(psi_nm)).sum(dim=(-2, -1))
+                    coeffs_list.append(c_nm)
+                    index.append((n, m))
 
-    def homogeneous_coefficients(self, U, T):
-        """Returns c_{ijk} where (i+j+k=d) with shape (B, K) + list of indices (i, j, k)"""
-
-        A = torch.einsum('im,bij,jn->bmn', T, U, T)  # change basis A[b,i,j] = coeff for x^i y^j
-        d = self.max_degree
-
-        coeffs, index = [], []
-
-        for i in range(d + 1):
-            for j in range(d + 1):
-
-                if i + j <= d:
-                    coeffs.append(A[:, i, j])
-                    index.append((i, j, d - i - j))
-        return torch.stack(coeffs, dim=-1), index  # (B, K)
+        coeffs = torch.stack(coeffs_list, dim=-1)  # shape (B, K)
+        return coeffs, index

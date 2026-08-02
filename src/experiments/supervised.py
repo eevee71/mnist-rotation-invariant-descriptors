@@ -18,7 +18,7 @@ def feature_ceiling(data, targets, degree=9, K=9, eval_n=None, seed=0):
 
     knn = KNeighborsClassifier(n_neighbors=15).fit(Xtr, ytr)
     lr = LogisticRegression(max_iter=2000).fit(Xtr, ytr)
-    qda = QuadraticDiscriminantAnalysis(reg_param=0.01).fit(Xtr, ytr)
+    qda = QuadraticDiscriminantAnalysis(reg_param=0.15).fit(Xtr, ytr)
 
     acc_knn = (knn.predict(Xte) == yte).mean()
     acc_lr = (lr.predict(Xte) == yte).mean()

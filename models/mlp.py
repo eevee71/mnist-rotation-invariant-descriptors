@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from src.pipeline import prepare_pipeline
 from torch.utils.data import DataLoader, TensorDataset
+from sklearn.preprocessing import StandardScaler
+from src.pipeline import prepare_pipeline
 
 
 class InvariantMLP(nn.Module):
@@ -11,6 +12,8 @@ class InvariantMLP(nn.Module):
     def __init__(self, input_dim, num_classes, hidden_dim=128):
         super().__init__()
         self.net = nn.Sequential(
+            # Input normalization layer for added stability
+            nn.BatchNorm1d(input_dim),
             nn.Linear(input_dim, hidden_dim),
             nn.BatchNorm1d(hidden_dim),
             nn.ReLU(),
@@ -32,6 +35,11 @@ def train_mlp(data, targets, degree=9, K=9, epochs=30, lr=1e-3, batch_size=64, s
 
     print(f"\n--- Preparing Data for MLP (degree={degree}, K={K}) ---")
     Xtr, Xte, ytr, yte, _ = prepare_pipeline(data, targets, degree=degree, K=K, seed=seed)
+
+    # 1. Standardize invariant features (Fit ONLY on training set)
+    scaler = StandardScaler()
+    Xtr = scaler.fit_transform(Xtr)
+    Xte = scaler.transform(Xte)
 
     Xtr_t, ytr_t = torch.tensor(Xtr, dtype=torch.float32), torch.tensor(ytr, dtype=torch.long)
     Xte_t, yte_t = torch.tensor(Xte, dtype=torch.float32), torch.tensor(yte, dtype=torch.long)
@@ -68,10 +76,10 @@ def train_mlp(data, targets, degree=9, K=9, epochs=30, lr=1e-3, batch_size=64, s
 
         if epoch == 1 or epoch % log_interval == 0 or epoch == epochs:
             print(
-                f"Epoch [{epoch:02d}/{epochs:02d}] | Train Loss: {epoch_train_loss:.4f} | Test Acc: {test_acc * 100:.2f}%")
+                f"Epoch [{epoch:02d}/{epochs:02d}] | Train Loss: {epoch_train_loss:.4f} | Test Acc: {test_acc * 100:.2f}%"
+            )
 
     final_acc = history['test_acc'][-1]
     print(f"--- Training Finished. Final Test Accuracy: {final_acc:.4f} ---")
 
     return model, final_acc, history
-

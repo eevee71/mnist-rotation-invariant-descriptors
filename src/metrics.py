@@ -5,7 +5,7 @@ def merge_labels(y, merges):
 
     y = np.asarray(y).copy()
     for a, b in merges.items():
-        y[y == a] = b
+        y[y == b] = a
 
     uniq = np.unique(y)
     remap = {v: i for i, v in enumerate(uniq)}

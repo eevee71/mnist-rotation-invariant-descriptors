@@ -4,6 +4,8 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+
 from src.pipeline import prepare_pipeline
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
@@ -122,13 +124,20 @@ def visualize_lda_projection(data, targets, degree=9, K=9, save_path=None):
     plt.show()
 
 
-def visualize_mlp_confusion_matrix(model, data, targets, degree=9, K=9, save_path=None):
+def visualize_mlp_confusion_matrix(model, data, targets, degree=9, K=9, save_path=None, scaler=None):
     """
     Evaluates the trained MLP model on the test set and plots a publication-ready confusion matrix.
     """
 
     print("[Pipeline] Preparing test features for MLP Confusion Matrix...")
-    _, Xte, _, yte, _ = prepare_pipeline(data, targets, degree=degree, K=K, seed=0)
+    Xtr, Xte, _, yte, _ = prepare_pipeline(data, targets, degree=degree, K=K, seed=0)
+
+    if scaler is not None:
+        Xte = scaler.transform(Xte)
+    else:
+        scaler_tmp = StandardScaler()
+        scaler_tmp.fit(Xtr)
+        Xte = scaler_tmp.transform(Xte)
 
     model.eval()
     with torch.no_grad():
