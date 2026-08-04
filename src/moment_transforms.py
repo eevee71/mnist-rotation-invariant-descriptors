@@ -2,14 +2,37 @@ import math
 import torch
 
 
-class MomentTransform:
+def gaussian_window(r):
+    """Standard Gaussian radial window, exp(-r**2 / 2).
 
-    def __init__(self, max_degree=6, spatial_dimensions=2):
+    This is the window the Hermite normalisation below assumes, so it is the
+    principled default. Alternatives (see ``window_sweep.WINDOWS``) still yield
+    usable features because any per-mode constant is absorbed downstream by the
+    StandardScaler, but they are not orthonormal.
+    """
+    return torch.exp(-(r ** 2) / 2.0)
+
+
+class MomentTransform:
+    """Image -> complex Hermite coefficients (Gaussian-weighted).
+
+    Each image is treated as a density map, recentred on its centroid and
+    rescaled to unit second moment, then projected onto a complex Hermite
+    basis. Under a rotation the resulting coefficients c_{n,m} only pick up a
+    phase, which ``SO2Invariants`` turns into rotation-invariant features.
+
+    ``window`` is a callable ``w(r) -> weights`` over the radius r = ||x||;
+    swap it to probe other radial profiles.
+    """
+
+    def __init__(self, max_degree=6, spatial_dimensions=2, window=gaussian_window):
         self.max_degree = max_degree
         self.spatial_dimensions = spatial_dimensions
+        self.window = window
 
     def prepare_density_center(self, images):
-        normalized = images / (images.sum(dim=(-2, -1), keepdim=True) + 1e-9)
+        """Normalise to a probability density and recentre on the centroid."""
+        density = images / (images.sum(dim=(-2, -1), keepdim=True) + 1e-9)
 
         rows, cols = images.shape[-2], images.shape[-1]
         y_grid, x_grid = torch.meshgrid(
@@ -20,74 +43,62 @@ class MomentTransform:
         x_grid = x_grid.float()
         y_grid = y_grid.float()
 
-        x_centered = x_grid - (normalized * x_grid).sum(dim=(-2, -1), keepdim=True)
-        y_centered = y_grid - (normalized * y_grid).sum(dim=(-2, -1), keepdim=True)
+        x = x_grid - (density * x_grid).sum(dim=(-2, -1), keepdim=True)
+        y = y_grid - (density * y_grid).sum(dim=(-2, -1), keepdim=True)
+        return density, x, y
 
-        return normalized, x_centered, y_centered
+    def second_moment_trace(self, density, x, y):
+        """Trace of the covariance matrix (the mean squared radius)."""
+        p_xx = (density * x * x).sum(dim=(-2, -1))
+        p_yy = (density * y * y).sum(dim=(-2, -1))
+        return p_xx + p_yy
 
-    def covariance_invariants(self, density_map, x, y):
-        p_xx = (density_map * x * x).sum(dim=(-2, -1))
-        p_yy = (density_map * y * y).sum(dim=(-2, -1))
-        p_xy = (density_map * x * y).sum(dim=(-2, -1))
-
-        p = torch.stack(
-            [
-                torch.stack([p_xx, p_xy], dim=-1),
-                torch.stack([p_xy, p_yy], dim=-1),
-            ],
-            dim=-2,
-        )
-
-        trace_p1 = torch.diagonal(p, dim1=-2, dim2=-1).sum(dim=-1)
-        trace_p2 = torch.diagonal(torch.matmul(p, p), dim1=-2, dim2=-1).sum(dim=-1)
-
-        return torch.stack([trace_p1, trace_p2], dim=-1)
-
-    def normalization(self, x, y, trace):
+    def normalize_scale(self, x, y, trace):
+        """Rescale coordinates to unit second moment (scale invariance)."""
         scale = torch.sqrt(trace / self.spatial_dimensions).view(-1, 1, 1)
         return x / scale, y / scale
 
     def complex_coefficients(self, images):
-        """Extracts complex Hermite coefficients mode-by-mode to keep memory footprint minimal."""
-        dm, xc, yc = self.prepare_density_center(images)
-        trace = self.covariance_invariants(dm, xc, yc)[:, 0]
-        xn, yn = self.normalization(xc, yc, trace)
+        """Project each image onto the complex Hermite basis, mode by mode.
+
+        Returns ``(coeffs, index)`` where ``coeffs`` has shape ``(B, K)`` and
+        ``index`` lists the ``(n, m)`` degree pair for each column.
+        """
+        density, xc, yc = self.prepare_density_center(images)
+        trace = self.second_moment_trace(density, xc, yc)
+        xn, yn = self.normalize_scale(xc, yc, trace)
 
         z = torch.complex(xn, yn)
         z_bar = torch.conj(z)
-        z_abs2 = xn**2 + yn**2
-       # gaussian_window = torch.exp(-0.5 * z_abs2)
-        r = torch.sqrt(z_abs2 + 1e-9)
-        gaussian_window = torch.exp(-(r ** 1.5))
+        r = torch.sqrt(xn ** 2 + yn ** 2 + 1e-9)
+        window = self.window(r)
 
-        coeffs_list = []
-        index = []
+        coeffs, index = [], []
         d = self.max_degree
-
         for n in range(d + 1):
             for m in range(n + 1):
-                if n + m <= d:
-                    H_nm = torch.zeros_like(z)
-                    for k in range(min(n, m) + 1):
-                        coeff = (
-                            ((-1) ** k)
-                            * math.factorial(n)
-                            * math.factorial(m)
-                            / (math.factorial(k) * math.factorial(n - k) * math.factorial(m - k))
-                        )
-                        z_pow = z ** (n - k) if (n - k) > 0 else torch.ones_like(z)
-                        z_bar_pow = z_bar ** (m - k) if (m - k) > 0 else torch.ones_like(z)
-                        H_nm = H_nm + coeff * z_pow * z_bar_pow
+                if n + m > d:
+                    continue
 
-                    norm = 1.0 / math.sqrt(
-                        math.pi * (2 ** (n + m)) * math.factorial(n) * math.factorial(m)
+                H = torch.zeros_like(z)
+                for k in range(min(n, m) + 1):
+                    coeff = (
+                        ((-1) ** k)
+                        * math.factorial(n) * math.factorial(m)
+                        / (math.factorial(k) * math.factorial(n - k) * math.factorial(m - k))
                     )
-                    psi_nm = norm * H_nm * gaussian_window
+                    z_pow = z ** (n - k) if (n - k) > 0 else torch.ones_like(z)
+                    z_bar_pow = z_bar ** (m - k) if (m - k) > 0 else torch.ones_like(z)
+                    H = H + coeff * z_pow * z_bar_pow
 
-                    # Immediately project per mode instead of accumulating 4D basis tensors
-                    c_nm = (dm * torch.conj(psi_nm)).sum(dim=(-2, -1))
-                    coeffs_list.append(c_nm)
-                    index.append((n, m))
+                norm = 1.0 / math.sqrt(
+                    math.pi * (2 ** (n + m)) * math.factorial(n) * math.factorial(m)
+                )
+                psi = norm * H * window
 
-        coeffs = torch.stack(coeffs_list, dim=-1)  # shape (B, K)
-        return coeffs, index
+                # Project the density onto this mode; keeps memory at O(B) per
+                # mode instead of materialising the full 4D basis tensor.
+                coeffs.append((density * torch.conj(psi)).sum(dim=(-2, -1)))
+                index.append((n, m))
+
+        return torch.stack(coeffs, dim=-1), index
