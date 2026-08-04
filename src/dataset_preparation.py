@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 from sklearn.model_selection import train_test_split
-
 from data.dataloader import rotate_dataset
 from src.embedder import Embedder
 from src.metrics import merge_labels

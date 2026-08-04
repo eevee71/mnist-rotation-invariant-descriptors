@@ -5,10 +5,13 @@ import torch
 class MomentTransform:
 
     def __init__(self, max_degree=6, spatial_dimensions=2):
+
         self.max_degree = max_degree
         self.spatial_dimensions = spatial_dimensions
 
+
     def prepare_density_center(self, images):
+
         normalized = images / (images.sum(dim=(-2, -1), keepdim=True) + 1e-9)
 
         rows, cols = images.shape[-2], images.shape[-1]
@@ -25,7 +28,9 @@ class MomentTransform:
 
         return normalized, x_centered, y_centered
 
+
     def covariance_invariants(self, density_map, x, y):
+
         p_xx = (density_map * x * x).sum(dim=(-2, -1))
         p_yy = (density_map * y * y).sum(dim=(-2, -1))
         p_xy = (density_map * x * y).sum(dim=(-2, -1))
@@ -43,12 +48,16 @@ class MomentTransform:
 
         return torch.stack([trace_p1, trace_p2], dim=-1)
 
+
     def normalization(self, x, y, trace):
+
         scale = torch.sqrt(trace / self.spatial_dimensions).view(-1, 1, 1)
         return x / scale, y / scale
 
+
     def complex_coefficients(self, images):
         """Extracts complex Hermite coefficients mode-by-mode to keep memory footprint minimal."""
+
         dm, xc, yc = self.prepare_density_center(images)
         trace = self.covariance_invariants(dm, xc, yc)[:, 0]
         xn, yn = self.normalization(xc, yc, trace)
@@ -84,7 +93,6 @@ class MomentTransform:
                     )
                     psi_nm = norm * H_nm * gaussian_window
 
-                    # Immediately project per mode instead of accumulating 4D basis tensors
                     c_nm = (dm * torch.conj(psi_nm)).sum(dim=(-2, -1))
                     coeffs_list.append(c_nm)
                     index.append((n, m))

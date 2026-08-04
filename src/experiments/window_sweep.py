@@ -1,15 +1,14 @@
 import math
-import numpy as np
 import torch
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.preprocessing import StandardScaler
-
 from data.dataloader import load_data
 from models.mlp import train_mlp
 from src.moment_transforms import MomentTransform
-from src.pipeline import prepare_pipeline
+from src.dataset_preparation import prepare_pipeline
 
-# 20 rotation-invariant radial window functions r = ||x||
+
+# rotation-invariant radial window functions r = ||x||
 WINDOW_FUNCTIONS = {
     # Standard Gaussian
     "01_Standard_Gaussian_r2": lambda r, x: torch.exp(-(r**2) / 2.0),
@@ -26,22 +25,19 @@ WINDOW_FUNCTIONS = {
     "10_ExpPower_r1.5": lambda r, x: torch.exp(-(r**1.5)),
     "11_ExpPower_r2.5": lambda r, x: torch.exp(-(r**2.5)),
     "12_ExpPower_r3.0": lambda r, x: torch.exp(-(r**3.0)),
-    # Hybrid multi-peak
+
     "13_Hybrid_Center_Plus_Ring1.0": lambda r, x: 0.5 * torch.exp(-(r**2) / 2.0)
     + 0.5 * torch.exp(-((r - 1.0) ** 2) / 2.0),
     "14_Hybrid_Center_Plus_Ring1.5": lambda r, x: 0.5 * torch.exp(-(r**2) / 2.0)
     + 0.5 * torch.exp(-((r - 1.5) ** 2) / 2.0),
-    # Heavy-tailed
     "15_Cauchy_1_over_1_plus_r2": lambda r, x: 1.0 / (1.0 + r**2),
     "16_HeavyTail_1_over_1_plus_r4": lambda r, x: 1.0 / (1.0 + r**4),
-    # Compact support
     "17_Compact_Cutoff_r1.5": lambda r, x: torch.where(
         r <= 1.5, torch.exp(-(r**2) / 2.0), torch.tensor(0.0, device=r.device)
     ),
     "18_Compact_Cutoff_r2.0": lambda r, x: torch.where(
         r <= 2.0, torch.exp(-(r**2) / 2.0), torch.tensor(0.0, device=r.device)
     ),
-    # Smooth windows
     "19_Cosine_Window_R2.0": lambda r, x: torch.where(
         r <= 2.0,
         torch.cos((torch.pi * r) / 4.0) ** 2,
@@ -64,7 +60,6 @@ def create_custom_complex_coefficients(window_fn):
         z_abs2 = xn**2 + yn**2
         r = torch.sqrt(z_abs2 + 1e-9)
 
-        # Custom radial window function replacing standard Gaussian exp(-0.5 * r^2)
         window = window_fn(r, z)
 
         coeffs_list = []
@@ -95,7 +90,6 @@ def create_custom_complex_coefficients(window_fn):
                     )
                     psi_nm = norm * H_nm * window
 
-                    # Directly project mode-by-mode
                     c_nm = (dm * torch.conj(psi_nm)).sum(dim=(-2, -1))
                     coeffs_list.append(c_nm)
                     index.append((n, m))
@@ -108,6 +102,7 @@ def create_custom_complex_coefficients(window_fn):
 
 def run_window_sweep(data, targets, degree=9, K=9, epochs=40, eval_n=5000):
     """Evaluate window functions on QDA and MLP classifiers."""
+
     results = []
 
     print(f"\n=== SWEEP OVER {len(WINDOW_FUNCTIONS)} WINDOW FUNCTIONS ===")
@@ -116,22 +111,18 @@ def run_window_sweep(data, targets, degree=9, K=9, epochs=40, eval_n=5000):
     for idx, (name, win_fn) in enumerate(WINDOW_FUNCTIONS.items(), 1):
         print(f"[{idx:02d}/{len(WINDOW_FUNCTIONS)}] Testing: {name} ...")
 
-        # Dynamic monkey-patching of the complex coefficients extraction
         MomentTransform.complex_coefficients = create_custom_complex_coefficients(win_fn)
 
         try:
-            # Extract features
             Xtr, Xte, ytr, yte, _ = prepare_pipeline(
                 data, targets, degree=degree, K=K, eval_n=eval_n, seed=0
             )
 
-            # Evaluate QDA
             sc = StandardScaler().fit(Xtr)
             Xtr_s, Xte_s = sc.transform(Xtr), sc.transform(Xte)
             qda = QuadraticDiscriminantAnalysis(reg_param=0.01).fit(Xtr_s, ytr)
             qda_acc = (qda.predict(Xte_s) == yte).mean()
 
-            # Evaluate MLP
             _, mlp_acc, _ = train_mlp(
                 data,
                 targets,
@@ -157,13 +148,13 @@ def run_window_sweep(data, targets, degree=9, K=9, epochs=40, eval_n=5000):
         except Exception as e:
             print(f"    [ERROR] {name}: {e}\n")
 
-    # Restore original function
     MomentTransform.complex_coefficients = original_coeffs_fn
     print_results_table(results)
 
 
 def print_results_table(results):
     """Print sorted results summary."""
+
     results_sorted = sorted(results, key=lambda x: x["avg_acc"], reverse=True)
 
     print("\n" + "=" * 75)

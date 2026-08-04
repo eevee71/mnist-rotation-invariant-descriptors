@@ -1,7 +1,7 @@
-from sklearn.cluster import KMeans, SpectralClustering
+from sklearn.cluster import SpectralClustering
 from sklearn.decomposition import PCA
 from sklearn.mixture import GaussianMixture
-from src.pipeline import prepare_pipeline
+from src.dataset_preparation import prepare_pipeline
 from src.whitening import BlockWhitener
 from src.experiments.utils import _score
 from src.visualization import visualize_cluster_prototypes
@@ -48,9 +48,7 @@ def compare_blockwhiten(data, targets, degree=9, K=9, chiral_weights=(0.0, 0.3, 
 
 
 def run_and_plot_best_clustering(data, targets, degree=9, K=9, save_path="results/cluster_prototypes.png"):
-    """
-    Helper function to run KMeans and plot cluster prototypes directly from the clustering module.
-    """
+    """Helper function to run KMeans and plot cluster prototypes directly from the clustering module."""
 
     Xtr, _, _, _, _ = prepare_pipeline(data, targets, degree=degree, K=K, seed=0)
 

@@ -3,8 +3,8 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis, QuadraticD
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier, NearestCentroid
 from sklearn.preprocessing import StandardScaler
-
-from src.pipeline import prepare_pipeline
+from sklearn.metrics import accuracy_score
+from src.dataset_preparation import prepare_pipeline
 from src.experiments.utils import _score
 
 
@@ -28,9 +28,8 @@ def feature_ceiling(data, targets, degree=9, K=9, eval_n=None, seed=0):
     return dict(knn=acc_knn, logreg=acc_lr, qda=acc_qda)
 
 
-def compare_supervised_projection(data, targets, degree=9, K=9, use_chirality=True, eval_n=None, seed=0, test_size=0.3):
-    """Evaluates clustering and classification performance in a discriminative LDA subspace."""
-
+def prepare_lda_subspace(data, targets, degree=9, K=9, use_chirality=True, eval_n=None, seed=0, test_size=0.3):
+    """Prepares data, applies feature standardization, and fits the LDA transformation."""
     Xtr, Xte, ytr, yte, _ = prepare_pipeline(data, targets, degree, K, use_chirality, eval_n, test_size, seed)
 
     sc = StandardScaler().fit(Xtr)
@@ -39,16 +38,56 @@ def compare_supervised_projection(data, targets, degree=9, K=9, use_chirality=Tr
     lda = LinearDiscriminantAnalysis(n_components=K - 1).fit(Xtr, ytr)
     Ztr, Zte = lda.transform(Xtr), lda.transform(Xte)
 
-    tag = "with chi" if use_chirality else "no chi"
-    out = {}
+    return Ztr, Zte, ytr, yte
 
-    nc = NearestCentroid().fit(Ztr, ytr)
-    out[f"NearestCentroid in LDA ({tag})"] = _score(yte, nc.predict(Zte))
 
-    pred = KMeans(K, n_init=10, random_state=seed).fit_predict(Zte)
-    out[f"KMeans in LDA subspace ({tag})"] = _score(yte, pred)
+def evaluate_qda_in_lda(data, targets, degree=9, K=9, use_chirality=True, eval_n=None, seed=0, test_size=0.3):
+    """Trains and evaluates a QDA classifier in the reduced LDA space, handling LDA subspace preparation internally."""
+
+    Ztr, Zte, ytr, yte = prepare_lda_subspace(
+        data, targets, degree=degree, K=K,
+        use_chirality=use_chirality, eval_n=eval_n, seed=seed, test_size=test_size
+    )
 
     qda = QuadraticDiscriminantAnalysis().fit(Ztr, ytr)
-    out[f"QDA in LDA subspace ({tag})"] = _score(yte, qda.predict(Zte))
+    y_pred = qda.predict(Zte)
+    score = _score(yte, y_pred)
 
-    return out
+    print(f"QDA Accuracy: {accuracy_score(yte, y_pred) * 100:.2f}%\n")
+    return score, yte, y_pred
+
+
+def evaluate_nearest_centroid_in_lda(Ztr, Zte, ytr, yte):
+    """Trains and evaluates a NearestCentroid classifier in the reduced LDA space."""
+
+    nc = NearestCentroid().fit(Ztr, ytr)
+    y_pred = nc.predict(Zte)
+    score = _score(yte, y_pred)
+    return score, yte, y_pred
+
+
+def evaluate_kmeans_in_lda(Zte, yte, K=9, seed=0):
+    """Performs KMeans clustering in the reduced LDA space."""
+
+    y_pred = KMeans(K, n_init=10, random_state=seed).fit_predict(Zte)
+    score = _score(yte, y_pred)
+    return score, yte, y_pred
+
+
+def evaluate_all_in_lda_space(data, targets, degree=9, K=9, use_chirality=True, eval_n=None, seed=0, test_size=0.3):
+    """Aggregates all LDA-subspace evaluations (NearestCentroid, KMeans, QDA) for convenience."""
+
+    Ztr, Zte, ytr, yte = prepare_lda_subspace(data, targets, degree, K, use_chirality, eval_n, seed, test_size)
+    tag = "with chi" if use_chirality else "no chi"
+
+    score_nc, _, _ = evaluate_nearest_centroid_in_lda(Ztr, Zte, ytr, yte)
+    score_km, _, _ = evaluate_kmeans_in_lda(Zte, yte, K=K, seed=seed)
+    score_qda, y_true, qda_preds = evaluate_qda_in_lda(Ztr, Zte, ytr, yte)
+
+    out = {
+        f"NearestCentroid in LDA ({tag})": score_nc,
+        f"KMeans in LDA subspace ({tag})": score_km,
+        f"QDA in LDA subspace ({tag})": score_qda,
+    }
+
+    return out, y_true, qda_preds

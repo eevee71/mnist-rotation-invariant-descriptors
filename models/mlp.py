@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import StandardScaler
-from src.pipeline import prepare_pipeline
+from src.dataset_preparation import prepare_pipeline
 
 
 class InvariantMLP(nn.Module):
@@ -82,4 +82,12 @@ def train_mlp(data, targets, degree=9, K=9, epochs=30, lr=1e-3, batch_size=64, s
     final_acc = history['test_acc'][-1]
     print(f"--- Training Finished. Final Test Accuracy: {final_acc:.4f} ---")
 
-    return model, final_acc, history
+    model.eval()
+    with torch.no_grad():
+        test_preds = model(Xte_t).argmax(dim=1).cpu().numpy()
+        yte_np = yte_t.cpu().numpy()
+
+    final_acc = history['test_acc'][-1]
+    print(f"--- Training Finished. Final Test Accuracy: {final_acc:.4f} ---")
+
+    return model, yte_np, test_preds

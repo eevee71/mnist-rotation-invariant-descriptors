@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
-from src.pipeline import prepare_pipeline
+from src.dataset_preparation import prepare_pipeline
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
 

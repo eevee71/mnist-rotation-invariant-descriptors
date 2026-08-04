@@ -48,6 +48,7 @@ class SO2Invariants:
 
     def __call__(self, coeffs):
         """coeffs (B, K) complex -> (B, 38) real rotation invariants"""
+
         coeffs = coeffs.to(self.cdtype)
 
         lin = coeffs[:, self.lin_idx].real  # (B, n_lin)
@@ -73,6 +74,7 @@ class SO2Invariants:
 
     def independent(self, coeffs):
         """coeffs (B, K) -> algebraically-independent invariants"""
+
         return self.__call__(coeffs)[:, self.independent_idx]
 
     def labels(self):
@@ -89,6 +91,7 @@ class SO2Invariants:
 
 def rotate_coeffs(coeffs, index, theta):
     """Rotates complex Hermite coefficients: c_{n,m} -> c_{n,m} * exp(-i (n-m) theta)"""
+
     frequencies = torch.tensor(
         [n - m for (n, m) in index], dtype=coeffs.real.dtype, device=coeffs.device
     )

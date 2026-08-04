@@ -2,7 +2,6 @@ import numpy as np
 import torch
 from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
-
 from src.embedder import Embedder
 from src.metrics import merge_labels, cluster_accuracy
 
