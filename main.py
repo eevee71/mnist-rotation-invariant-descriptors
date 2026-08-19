@@ -10,11 +10,11 @@ def main():
     data, targets = load_data(full_dataset=True)
 
     print("\n=== QDA ===")
-    _, y_true, y_pred = train_qda(data, targets, degree=11, K=9, reg_param=0.15)
+    _, y_true, y_pred = train_qda(data, targets, degree=9, K=9, reg_param=0.15)
     classification_metrics(y_true, y_pred)
 
     print("\n=== MLP ===")
-    _, y_true, y_pred = train_mlp(data, targets, degree=11, K=9, epochs=30)
+    _, y_true, y_pred = train_mlp(data, targets, degree=9, K=9, epochs=30)
     classification_metrics(y_true, y_pred)
     plot_confusion_matrix(y_true, y_pred, save_path="results/mlp_confusion_matrix.png")
 

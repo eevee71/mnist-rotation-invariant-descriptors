@@ -6,7 +6,7 @@ from src.so2_invariants import SO2Invariants
 
 class Embedder:
 
-    def __init__(self, max_degree=6, dtype=torch.float32, window=gaussian_window):
+    def __init__(self, max_degree=9, dtype=torch.float32, window=gaussian_window):
         self.mt = MomentTransform(max_degree=max_degree, window=window)
         self.inv = None
         self.dtype = dtype
