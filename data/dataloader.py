@@ -21,9 +21,10 @@ def load_MNIST(train=True, transform=None):
     print(f"targets {targets.shape}")
     return data, targets
 
-def load_data(full_dataset=True, seed=0):
-    """Wrapper function, loads both train and test sets combined into one Tensor if full_dataset=True.
-    """
+
+def load_data(full_dataset=True):
+    """Wrapper function, loads both train and test sets
+    combined into one Tensor if full_dataset=True."""
 
     if full_dataset:
         data_tr, targets_tr = load_MNIST(train=True)
@@ -54,26 +55,3 @@ def rotate_dataset(data, targets, max_angle=180, seed=None):
     ])
 
     return rotated_data, targets
-
-def flip_dataset(data, targets, mode='horizontal'):
-    """Flips image tensors horizontally or vertically."""
-
-    if mode == 'horizontal':
-        flipped = TVF.hflip(data)
-    elif mode == 'vertical':
-        flipped = TVF.vflip(data)
-    else:
-        raise ValueError("Mode must be either 'horizontal' or 'vertical'.")
-
-    return flipped, targets
-
-def flip_dataset(data, targets, mode='horizontal'):
-    """Flips image tensors."""
-    if mode == 'horizontal':
-        flipped = TVF.hflip(data)
-    elif mode == 'vertical':
-        flipped = TVF.vflip(data)
-    else:
-        raise ValueError("Use 'horizontal' or 'vertical'.")
-
-    return flipped, targets

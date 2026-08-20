@@ -51,7 +51,7 @@ class MomentTransform:
 
     def normalization(self, x, y, trace):
 
-        scale = torch.sqrt(trace / self.spatial_dimensions).view(-1, 1, 1)
+        scale = torch.sqrt(trace / 3).view(-1, 1, 1)
         return x / scale, y / scale
 
 

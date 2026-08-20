@@ -27,25 +27,25 @@ def get_features(data, targets, degree=9, K=9, use_chirality=True, eval_n=None):
     return raw, y_m, C, embedder
 
 
-def prepare_pipeline(data, targets, degree=9, K=9, use_chirality=True, eval_n=None, test_size=0.3, seed=0):
+def prepare_pipeline(data, targets, degree=9, k=9, use_chirality=True, eval_n=None, test_size=0.3, seed=0):
     """Splits raw images, rotates test set, and extracts invariants."""
 
     if eval_n is not None:
         data, targets = data[:eval_n], targets[:eval_n]
 
-    # Train/test split on raw image tensors
+    # train/test split on raw image tensors
     y_raw = targets.cpu().numpy()
     img_tr, img_te, ytr_raw, yte_raw = train_test_split(
         data, y_raw, test_size=test_size, random_state=seed, stratify=y_raw
     )
 
-    # Rotate test images
+    # rotate test images
     img_te_rot, yte_tensor = rotate_dataset(
         img_te, torch.tensor(yte_raw), max_angle=180, seed=42
     )
 
-    # Extract features (invariants)
-    Xtr, ytr, _, embedder = get_features(img_tr, torch.tensor(ytr_raw), degree, K, use_chirality, eval_n=None)
-    Xte, yte, _, _ = get_features(img_te_rot, yte_tensor, degree, K, use_chirality, eval_n=None)
+    # extract features (invariants)
+    Xtr, ytr, _, embedder = get_features(img_tr, torch.tensor(ytr_raw), degree, k, use_chirality, eval_n=None)
+    Xte, yte, _, _ = get_features(img_te_rot, yte_tensor, degree, k, use_chirality, eval_n=None)
 
     return Xtr, Xte, ytr, yte, embedder

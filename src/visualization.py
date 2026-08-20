@@ -1,11 +1,8 @@
-import torch
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
-
 from src.dataset_preparation import prepare_pipeline
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
@@ -73,7 +70,7 @@ def visualize_cluster_sweep(data, targets, k_values=[5, 8, 10, 15, 20], degree=9
     and pops up the plot window on the screen for each K sequentially.
     """
 
-    Xtr, _, _, _, _ = prepare_pipeline(data, targets, degree=degree, K=9, seed=0)
+    Xtr, _, _, _, _ = prepare_pipeline(data, targets, degree=degree, k=9, seed=0)
     os.makedirs(save_dir, exist_ok=True)
 
     for k in k_values:
@@ -94,13 +91,13 @@ def visualize_cluster_sweep(data, targets, k_values=[5, 8, 10, 15, 20], degree=9
     print(f"[Completed] All K-sweep figures saved and displayed")
 
 
-def visualize_lda_projection(data, targets, degree=9, K=9, save_path=None):
+def visualize_lda_projection(data, targets, degree=9, k=9, save_path=None):
     """
     Projects invariant features into a 2D LDA subspace and visualizes class separation.
     """
 
     print("[Pipeline] Preparing features for LDA projection...")
-    Xtr, _, ytr, _, _ = prepare_pipeline(data, targets, degree=degree, K=K, seed=0)
+    Xtr, _, ytr, _, _ = prepare_pipeline(data, targets, degree=degree, k=k, seed=0)
 
     print("[LDA] Fitting and projecting data...")
     lda = LDA(n_components=2)
@@ -112,7 +109,7 @@ def visualize_lda_projection(data, targets, degree=9, K=9, save_path=None):
     cbar = fig.colorbar(scatter, ax=ax, ticks=range(10))
     cbar.set_label("Digit Classes", fontsize=11)
 
-    ax.set_title(f"LDA Subspace Projection (Degree = {degree}, K = {K})", fontsize=13, fontweight='bold')
+    ax.set_title(f"LDA Subspace Projection (Degree = {degree}, K = {k})", fontsize=13, fontweight='bold')
     ax.set_xlabel("LDA Component 1", fontsize=11)
     ax.set_ylabel("LDA Component 2", fontsize=11)
 
@@ -124,40 +121,22 @@ def visualize_lda_projection(data, targets, degree=9, K=9, save_path=None):
     plt.show()
 
 
-def visualize_mlp_confusion_matrix(model, data, targets, degree=9, K=9, save_path=None, scaler=None):
-    """
-    Evaluates the trained MLP model on the test set and plots a publication-ready confusion matrix.
-    """
+def plot_confusion_matrix(y_true, y_pred, title="Confusion Matrix", save_path=None):
+    """Plots a confusion matrix directly from true and predicted labels."""
 
-    print("[Pipeline] Preparing test features for MLP Confusion Matrix...")
-    Xtr, Xte, _, yte, _ = prepare_pipeline(data, targets, degree=degree, K=K, seed=0)
-
-    if scaler is not None:
-        Xte = scaler.transform(Xte)
-    else:
-        scaler_tmp = StandardScaler()
-        scaler_tmp.fit(Xtr)
-        Xte = scaler_tmp.transform(Xte)
-
-    model.eval()
-    with torch.no_grad():
-        inputs = torch.FloatTensor(Xte)
-        outputs = model(inputs)
-        _, preds = torch.max(outputs, 1)
-
-    cm = confusion_matrix(yte, preds.numpy())
+    cm = confusion_matrix(y_true, y_pred)
 
     fig, ax = plt.subplots(figsize=(7, 6), constrained_layout=True)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
     disp.plot(ax=ax, cmap='Blues', colorbar=True, values_format='d')
 
-    ax.set_title("MLP Classifier Confusion Matrix", fontsize=13, fontweight='bold')
+    ax.set_title(title, fontsize=13, fontweight='bold')
     ax.set_xlabel("Predicted Label", fontsize=11)
     ax.set_ylabel("True Label", fontsize=11)
 
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"[Saved] MLP Confusion Matrix saved to: {save_path}")
+        print(f"Confusion Matrix saved to: {save_path}")
 
     plt.show()

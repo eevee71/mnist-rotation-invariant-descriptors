@@ -10,15 +10,18 @@ from src.dataset_preparation import prepare_pipeline
 
 # rotation-invariant radial window functions r = ||x||
 WINDOW_FUNCTIONS = {
+
     # Standard Gaussian
     "01_Standard_Gaussian_r2": lambda r, x: torch.exp(-(r**2) / 2.0),
     "02_Gaussian_Narrow_r2_scale0.5": lambda r, x: torch.exp(-(r**2)),
     "03_Gaussian_Wide_r2_scale2.0": lambda r, x: torch.exp(-(r**2) / 4.0),
+
     # Ring / Donut Gaussian
     "04_Ring_Gaussian_r1.0": lambda r, x: torch.exp(-((r - 1.0) ** 2) / 2.0),
     "05_Ring_Gaussian_r0.5": lambda r, x: torch.exp(-((r - 0.5) ** 2) / 2.0),
     "06_Ring_Gaussian_r1.5": lambda r, x: torch.exp(-((r - 1.5) ** 2) / 2.0),
     "07_Ring_Gaussian_r2.0": lambda r, x: torch.exp(-((r - 2.0) ** 2) / 2.0),
+
     # Exponential Power / Laplace
     "08_Laplace_r1": lambda r, x: torch.exp(-r),
     "09_Laplace_r1_scale0.5": lambda r, x: torch.exp(-2.0 * r),
@@ -100,7 +103,7 @@ def create_custom_complex_coefficients(window_fn):
     return custom_complex_coefficients
 
 
-def run_window_sweep(data, targets, degree=9, K=9, epochs=40, eval_n=5000):
+def run_window_sweep(data, targets, degree=9, k=9, epochs=40, eval_n=5000):
     """Evaluate window functions on QDA and MLP classifiers."""
 
     results = []
@@ -115,7 +118,7 @@ def run_window_sweep(data, targets, degree=9, K=9, epochs=40, eval_n=5000):
 
         try:
             Xtr, Xte, ytr, yte, _ = prepare_pipeline(
-                data, targets, degree=degree, K=K, eval_n=eval_n, seed=0
+                data, targets, degree=degree, k=k, eval_n=eval_n, seed=0
             )
 
             sc = StandardScaler().fit(Xtr)
@@ -127,7 +130,7 @@ def run_window_sweep(data, targets, degree=9, K=9, epochs=40, eval_n=5000):
                 data,
                 targets,
                 degree=degree,
-                K=K,
+                k=k,
                 epochs=epochs,
                 batch_size=64,
                 seed=0,
@@ -179,4 +182,4 @@ def print_results_table(results):
 
 if __name__ == "__main__":
     data, targets = load_data(full_dataset=True)
-    run_window_sweep(data, targets, degree=9, K=9, epochs=60 , eval_n=5000)
+    run_window_sweep(data, targets, degree=9, k=9, epochs=60, eval_n=5000)

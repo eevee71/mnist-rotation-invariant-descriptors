@@ -21,6 +21,7 @@ def print_compare(out):
     best = max(out.items(), key=lambda x: x[1]['acc'])
     print(f"\nBEST: {best[0]} -> acc={best[1]['acc']:.4f}")
 
+
 def print_report(results, top=10):
     fmt = "{:>3} {:>3} {:>6.2f} {:>4} {:>7.4f} {:>7.4f} {:>7.4f}"
 
