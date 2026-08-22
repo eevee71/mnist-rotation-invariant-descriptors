@@ -1,5 +1,5 @@
 from data.dataloader import load_data
-from models.mlp import train_mlp
+from src.models.mlp import train_mlp
 from src.metrics import classification_metrics
 from src.experiments.supervised import feature_ceiling, evaluate_all_in_lda_space
 from src.experiments.utils import print_compare

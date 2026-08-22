@@ -6,16 +6,13 @@ from src.embedder import Embedder
 from src.metrics import merge_labels
 
 
-def get_features(data, targets, degree=9, K=9, use_chirality=True, eval_n=None):
+def get_features(data, targets, degree=9, K=9, eval_n=None):
     """Path for extracting invariants and merging labels directly."""
 
     y = np.asarray(targets.cpu().numpy())
     embedder = Embedder(max_degree=degree)
     coeffs = embedder._coeffs(data)
     raw = embedder.inv(coeffs).cpu().numpy()
-
-    if not use_chirality:
-        raw = raw[:, embedder.inv.achiral_idx]
 
     if eval_n is not None:
         raw, y = raw[:eval_n], y[:eval_n]
@@ -27,7 +24,7 @@ def get_features(data, targets, degree=9, K=9, use_chirality=True, eval_n=None):
     return raw, y_m, C, embedder
 
 
-def prepare_pipeline(data, targets, degree=9, k=9, use_chirality=True, eval_n=None, test_size=0.3, seed=0):
+def prepare_pipeline(data, targets, degree=9, k=9, eval_n=None, test_size=0.3, seed=0):
     """Splits raw images, rotates test set, and extracts invariants."""
 
     if eval_n is not None:
@@ -45,7 +42,7 @@ def prepare_pipeline(data, targets, degree=9, k=9, use_chirality=True, eval_n=No
     )
 
     # extract features (invariants)
-    Xtr, ytr, _, embedder = get_features(img_tr, torch.tensor(ytr_raw), degree, k, use_chirality, eval_n=None)
-    Xte, yte, _, _ = get_features(img_te_rot, yte_tensor, degree, k, use_chirality, eval_n=None)
+    Xtr, ytr, _, embedder = get_features(img_tr, torch.tensor(ytr_raw), degree, k, eval_n=None)
+    Xte, yte, _, _ = get_features(img_te_rot, yte_tensor, degree, k, eval_n=None)
 
     return Xtr, Xte, ytr, yte, embedder

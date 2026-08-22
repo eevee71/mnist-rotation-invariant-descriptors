@@ -1,5 +1,5 @@
 from data.dataloader import load_data
-from models.mlp import train_mlp
+from src.models.mlp import train_mlp
 from src.metrics import classification_metrics
 from src.experiments.supervised import evaluate_qda_in_lda
 from src.visualization import plot_confusion_matrix
