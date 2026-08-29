@@ -3,7 +3,7 @@ import torch
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.preprocessing import StandardScaler
 from data.dataloader import load_data
-from models.mlp import train_mlp
+from src.models.mlp import train_mlp
 from src.moment_transforms import MomentTransform
 from src.dataset_preparation import prepare_pipeline
 
