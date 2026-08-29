@@ -26,14 +26,29 @@ def classification_metrics(y_true, y_pred, class_names=None, digits=4):
     return summary
 
 
-def merge_labels(y, merges):
+def merge_labels(y, merges, n_source_classes=10):
+    """Merge rotation-equivalent digit labels and remap to a contiguous range.
+
+    The remap is built from the full source label set (0..9), not from the
+    labels present in `y`. This guarantees that train and test receive the
+    identical mapping even if a split happens to be missing a class.
+    """
 
     y = np.asarray(y).copy()
     for a, b in merges.items():
         y[y == b] = a
 
-    uniq = np.unique(y)
+    all_labels = np.arange(n_source_classes)
+    for a, b in merges.items():
+        all_labels[all_labels == b] = a
+
+    uniq = np.unique(all_labels)
     remap = {v: i for i, v in enumerate(uniq)}
+
+    unseen = set(np.unique(y)) - set(remap)
+    if unseen:
+        raise ValueError(f"labels not covered by the remap: {sorted(unseen)}")
+
     y_new = np.array([remap[v] for v in y], dtype=np.int64)
 
     return y_new, len(uniq)

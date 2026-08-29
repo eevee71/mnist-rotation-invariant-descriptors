@@ -45,10 +45,11 @@ class SO2Invariants:
         self.achiral_idx = self.independent_idx
         self.chiral_idx = im_offsets
 
+        # diagnostic, filled in on each __call__
+        self.last_ref_abs = None
 
     def amplitudes(self, coeffs):
         return coeffs.to(self.cdtype)
-
 
     def __call__(self, coeffs):
         """coeffs (B, K) complex -> (B, 38) real rotation invariants"""
@@ -59,16 +60,23 @@ class SO2Invariants:
         Zp = coeffs[:, self.pos_idx]  # (B, n_pos)
         mags = Zp.abs() ** 2  # (B, n_pos)
 
-        # Perform phase alignment relative to the chosen reference mode
+        # Phase alignment relative to the chosen reference mode.
+        # The reference is normalized to unit modulus so that only its PHASE
+        # is used. Using the raw coefficient would scale each feature by
+        # |g|^s (s up to `degree`), which injects a large nuisance magnitude
+        # unrelated to shape and destabilizes downstream covariance estimates.
         g = Zp[:, self.ref_pos]
-        g_conj = torch.conj(g)
+        g_abs = g.abs()
+        self.last_ref_abs = g_abs.detach()
+        g_hat = g / g_abs.clamp(min=1e-12).to(self.cdtype)
+        g_conj = torch.conj(g_hat)
 
         phase = []
         for c, s in enumerate(self.pos_s):
             if c == self.ref_pos:
                 continue
             # Neutralize the phase shift induced by spatial rotation
-            W = Zp[:, c] * (g_conj**s)
+            W = Zp[:, c] * (g_conj ** s)
             phase.append(W.real)
             phase.append(W.imag)
         # Concatenate all derived invariant descriptors
@@ -78,12 +86,25 @@ class SO2Invariants:
 
         return torch.cat(parts, dim=-1).to(self.dtype)
 
+    def ref_magnitude_report(self, eps=1e-6):
+        """Diagnostic: how often the reference coefficient is near zero.
+
+        When |g| is small the phase estimate is unstable and the aligned
+        features become noise. Report this in the paper.
+        """
+        if self.last_ref_abs is None:
+            return None
+        a = self.last_ref_abs
+        return {
+            "min": a.min().item(),
+            "median": a.median().item(),
+            "frac_below_eps": (a < eps).float().mean().item(),
+        }
 
     def independent(self, coeffs):
         """Extract algebraically independent invariants by omitting redundant imaginary components."""
 
         return self.__call__(coeffs)[:, self.independent_idx]
-
 
     def labels(self):
 
@@ -94,9 +115,8 @@ class SO2Invariants:
             if c == self.ref_pos:
                 continue
             s = n - m
-            labs += [f"Re c[{n},{m}]*conj(g)^{s}", f"Im c[{n},{m}]*conj(g)^{s}"]
+            labs += [f"Re c[{n},{m}]*conj(g_hat)^{s}", f"Im c[{n},{m}]*conj(g_hat)^{s}"]
         return labs
-
 
 
 def rotate_coeffs(coeffs, index, theta):
@@ -111,7 +131,11 @@ def rotate_coeffs(coeffs, index, theta):
 
 def fit_scale(features, alpha=1.0, eps=1e-8):
     """Calculate the feature-wise standard deviation vector exponentiated
-    by parameter alpha for feature normalization."""
+    by parameter alpha for feature normalization.
+
+    Currently unused: the pipeline calls `embedder.inv(...)` directly and
+    standardization is handled by StandardScaler in the classifiers.
+    """
 
     std = features.std(dim=0, unbiased=False)
     return std.clamp(min=eps) ** alpha

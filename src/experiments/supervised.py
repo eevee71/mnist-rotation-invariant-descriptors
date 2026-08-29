@@ -7,10 +7,12 @@ from src.dataset_preparation import prepare_pipeline
 from src.experiments.utils import _score
 
 
-def feature_ceiling(data, targets, degree=9, k=9, eval_n=None, seed=0):
+def feature_ceiling(splits, degree=9, k=9, eval_n=None, rot_seed=42):
     """Benchmarks supervised classifiers (kNN, LogReg, QDA) to establish an accuracy ceiling."""
 
-    Xtr, Xte, ytr, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k, eval_n=eval_n, seed=seed)
+    Xtr, Xte, ytr, yte, _ = prepare_pipeline(
+        splits, degree=degree, k=k, eval_n=eval_n, rot_seed=rot_seed
+    )
 
     sc = StandardScaler()
     Xtr = sc.fit_transform(Xtr)
@@ -28,13 +30,17 @@ def feature_ceiling(data, targets, degree=9, k=9, eval_n=None, seed=0):
     return dict(knn=acc_knn, logreg=acc_lr, qda=acc_qda)
 
 
-def prepare_lda_subspace(data, targets, degree=9, k=9, use_chirality=True, eval_n=None, seed=0, test_size=0.3):
-    """Prepares data, applies feature standardization, and fits the LDA transformation."""
+def prepare_lda_subspace(splits, degree=9, k=9, eval_n=None, rot_seed=42):
+    """Prepares data, applies feature standardization, and fits the LDA transformation.
+
+    The scaler and the LDA projection are both fitted on the upright training
+    features only, then applied to the rotated test features.
+    """
 
     Xtr, Xte, ytr, yte, _ = prepare_pipeline(
-        data, targets, degree=degree, k=k, use_chirality=use_chirality,
-        eval_n=eval_n, test_size=test_size, seed=seed
+        splits, degree=degree, k=k, eval_n=eval_n, rot_seed=rot_seed
     )
+
     sc = StandardScaler()
     Xtr = sc.fit_transform(Xtr)
     Xte = sc.transform(Xte)
@@ -46,20 +52,23 @@ def prepare_lda_subspace(data, targets, degree=9, k=9, use_chirality=True, eval_
 
 
 def evaluate_qda_in_lda(
-        data_or_Ztr, targets_or_Zte, ytr=None, yte=None,
-        degree=9, k=9, use_chirality=True, eval_n=None, seed=0, test_size=0.3
+        splits_or_Ztr, Zte=None, ytr=None, yte=None,
+        degree=9, k=9, eval_n=None, rot_seed=42
 ):
     """
     Trains and evaluates QDA in LDA space.
-    Accepts either (data, targets) OR precomputed (Ztr, Zte, ytr, yte).
+
+    Accepts either a `splits` tuple (train_data, train_targets, test_data,
+    test_targets), or precomputed (Ztr, Zte, ytr, yte) when the LDA subspace
+    has already been built.
     """
 
-    if ytr is not None and yte is not None:
-        Ztr, Zte = data_or_Ztr, targets_or_Zte
+    if Zte is not None and ytr is not None and yte is not None:
+        Ztr = splits_or_Ztr
     else:
         Ztr, Zte, ytr, yte = prepare_lda_subspace(
-            data_or_Ztr, targets_or_Zte, degree=degree, k=k,
-            use_chirality=use_chirality, eval_n=eval_n, seed=seed, test_size=test_size
+            splits_or_Ztr, degree=degree, k=k,
+            eval_n=eval_n, rot_seed=rot_seed
         )
 
     qda = QuadraticDiscriminantAnalysis().fit(Ztr, ytr)
@@ -67,7 +76,7 @@ def evaluate_qda_in_lda(
     score = _score(yte, y_pred)
 
     acc = (y_pred == yte).mean()
-    print(f"QDA Accuracy: {acc * 100:.2f}%\n")
+    print(f"QDA Accuracy (held-out rotated test): {acc * 100:.2f}%\n")
     return score, yte, y_pred
 
 
@@ -88,14 +97,13 @@ def evaluate_kmeans_in_lda(Zte, yte, k=9, seed=0):
     return score, yte, y_pred
 
 
-def evaluate_all_in_lda_space(data, targets, degree=9, k=9, use_chirality=True, eval_n=None, seed=0, test_size=0.3):
+def evaluate_all_in_lda_space(splits, degree=9, k=9, eval_n=None, seed=0, rot_seed=42):
     """Aggregates all LDA-subspace evaluations without redundant LDA re-computations."""
 
     Ztr, Zte, ytr, yte = prepare_lda_subspace(
-        data, targets, degree=degree, k=k, use_chirality=use_chirality,
-        eval_n=eval_n, seed=seed, test_size=test_size
+        splits, degree=degree, k=k,
+        eval_n=eval_n, rot_seed=rot_seed
     )
-    tag = "with chi" if use_chirality else "no chi"
 
     score_nc, _, _ = evaluate_nearest_centroid_in_lda(Ztr, Zte, ytr, yte)
     score_km, _, _ = evaluate_kmeans_in_lda(Zte, yte, k=k, seed=seed)
@@ -103,9 +111,9 @@ def evaluate_all_in_lda_space(data, targets, degree=9, k=9, use_chirality=True, 
     score_qda, y_true, qda_preds = evaluate_qda_in_lda(Ztr, Zte, ytr, yte)
 
     out = {
-        f"NearestCentroid in LDA ({tag})": score_nc,
-        f"KMeans in LDA subspace ({tag})": score_km,
-        f"QDA in LDA subspace ({tag})": score_qda,
+        f"NearestCentroid in LDA": score_nc,
+        f"KMeans in LDA subspace": score_km,
+        f"QDA in LDA subspace": score_qda,
     }
 
     return out, y_true, qda_preds

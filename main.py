@@ -7,11 +7,11 @@ from src.visualization import plot_confusion_matrix
 
 def main():
 
-    print("=== Loading Dataset ===")
-    data, targets = load_data(full_dataset=True)
+    print("=== Loading Dataset (official 60k/10k split) ===")
+    splits = load_data()
 
     print("\n=== Supervised Projection (QDA) ===")
-    score_qda, y_true_qda, y_pred_qda = evaluate_qda_in_lda(data, targets)
+    score_qda, y_true_qda, y_pred_qda = evaluate_qda_in_lda(splits)
     classification_metrics(y_true_qda, y_pred_qda)
 
     print("\n=== Generating QDA Confusion Matrix ===")
@@ -20,13 +20,14 @@ def main():
                           save_path="results/qda_confusion_matrix.png")
 
     print("\n=== Training Invariant MLP Classifier ===")
-    mlp_model, y_true_mlp, y_pred_mlp = train_mlp(data, targets, epochs=45, degree=9, k=9)
+    mlp_model, y_true_mlp, y_pred_mlp = train_mlp(splits, epochs=45, degree=9, k=10)
     classification_metrics(y_true_mlp, y_pred_mlp)
 
     print("\n=== Generating MLP Confusion Matrix ===")
     plot_confusion_matrix(y_true=y_true_mlp, y_pred=y_pred_mlp,
                           title="MLP Classifier Confusion Matrix",
                           save_path="results/mlp_confusion_matrix.png")
+
 
 if __name__ == "__main__":
     main()

@@ -3,12 +3,25 @@ import torch
 
 
 class MomentTransform:
+    """Complex (Ito-)Hermite expansion of a centered, rescaled image density.
 
-    def __init__(self, max_degree=6, spatial_dimensions=2):
+    The basis functions are
+
+        psi_nm(z) = H_nm(z, conj(z)) * exp(-|z|^2 / 2)
+                    / sqrt(pi * 2^(n+m) * n! * m!)
+
+    which are orthonormal with respect to the Gaussian measure. The
+    normalization constant above is tied to the exp(-|z|^2 / 2) window: with
+    any other radial window the factorials no longer orthonormalize anything
+    and the per-order scaling becomes arbitrary. Rotation invariance survives
+    any radial window, orthonormality does not.
+    """
+
+    def __init__(self, max_degree=6, spatial_dimensions=2, window="gaussian"):
 
         self.max_degree = max_degree
         self.spatial_dimensions = spatial_dimensions
-
+        self.window = window
 
     def prepare_density_center(self, images):
 
@@ -27,7 +40,6 @@ class MomentTransform:
         y_centered = y_grid - (normalized * y_grid).sum(dim=(-2, -1), keepdim=True)
 
         return normalized, x_centered, y_centered
-
 
     def covariance_invariants(self, density_map, x, y):
 
@@ -48,12 +60,24 @@ class MomentTransform:
 
         return torch.stack([trace_p1, trace_p2], dim=-1)
 
-
     def normalization(self, x, y, trace):
 
         scale = torch.sqrt(trace / 3).view(-1, 1, 1)
         return x / scale, y / scale
 
+    def _window(self, z_abs2):
+        """Radial window. Gaussian is the default and the only one for which
+        the basis normalization constants are correct."""
+
+        if self.window == "gaussian":
+            return torch.exp(-0.5 * z_abs2)
+        if isinstance(self.window, (int, float)):
+            # exp(-r^p), for ablating the window exponent. NOTE: breaks
+            # orthonormality; the resulting coefficients are a non-orthogonal
+            # expansion and per-order scales are arbitrary.
+            r = torch.sqrt(z_abs2 + 1e-9)
+            return torch.exp(-(r ** float(self.window)))
+        raise ValueError(f"unknown window: {self.window!r}")
 
     def complex_coefficients(self, images):
         """Extracts complex Hermite coefficients mode-by-mode to keep memory footprint minimal."""
@@ -65,9 +89,7 @@ class MomentTransform:
         z = torch.complex(xn, yn)
         z_bar = torch.conj(z)
         z_abs2 = xn**2 + yn**2
-       # gaussian_window = torch.exp(-0.5 * z_abs2)
-        r = torch.sqrt(z_abs2 + 1e-9)
-        gaussian_window = torch.exp(-(r ** 1.5))
+        window = self._window(z_abs2)
 
         coeffs_list = []
         index = []
@@ -91,7 +113,7 @@ class MomentTransform:
                     norm = 1.0 / math.sqrt(
                         math.pi * (2 ** (n + m)) * math.factorial(n) * math.factorial(m)
                     )
-                    psi_nm = norm * H_nm * gaussian_window
+                    psi_nm = norm * H_nm * window
 
                     c_nm = (dm * torch.conj(psi_nm)).sum(dim=(-2, -1))
                     coeffs_list.append(c_nm)
