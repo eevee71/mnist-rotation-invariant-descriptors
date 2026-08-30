@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from sklearn.model_selection import train_test_split
 from data.dataloader import rotate_dataset
 from src.embedder import Embedder
 from src.metrics import merge_labels
@@ -17,24 +16,22 @@ def get_features(data, targets, degree=9, K=9, eval_n=None):
     if eval_n is not None:
         raw, y = raw[:eval_n], y[:eval_n]
 
-    merges = {6: 9} if K == 9 else {6: 9, 2: 5}
+    merges = {} if K == 10 else ({6: 9} if K == 9 else {6: 9, 2: 5})
     y_m, C = merge_labels(y, merges)
     assert C == K
 
     return raw, y_m, C, embedder
 
 
-def prepare_pipeline(data, targets, degree=9, k=9, eval_n=None, test_size=0.3, seed=0):
+def prepare_pipeline(data, targets, degree=9, k=9, eval_n=None):
     """Splits raw images, rotates test set, and extracts invariants."""
 
     if eval_n is not None:
         data, targets = data[:eval_n], targets[:eval_n]
 
-    # train/test split on raw image tensors
     y_raw = targets.cpu().numpy()
-    img_tr, img_te, ytr_raw, yte_raw = train_test_split(
-        data, y_raw, test_size=test_size, random_state=seed, stratify=y_raw
-    )
+    img_tr, img_te = data[:60000], data[60000:]
+    ytr_raw, yte_raw = y_raw[:60000], y_raw[60000:]
 
     # rotate test images
     img_te_rot, yte_tensor = rotate_dataset(

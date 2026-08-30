@@ -70,7 +70,7 @@ def visualize_cluster_sweep(data, targets, k_values=[5, 8, 10, 15, 20], degree=9
     and pops up the plot window on the screen for each K sequentially.
     """
 
-    Xtr, _, _, _, _ = prepare_pipeline(data, targets, degree=degree, k=9, seed=0)
+    Xtr, _, _, _, _ = prepare_pipeline(data, targets, degree=degree, k=9)
     os.makedirs(save_dir, exist_ok=True)
 
     for k in k_values:
@@ -97,7 +97,7 @@ def visualize_lda_projection(data, targets, degree=9, k=9, save_path=None):
     """
 
     print("[Pipeline] Preparing features for LDA projection...")
-    Xtr, _, ytr, _, _ = prepare_pipeline(data, targets, degree=degree, k=k, seed=0)
+    Xtr, _, ytr, _, _ = prepare_pipeline(data, targets, degree=degree, k=k)
 
     print("[LDA] Fitting and projecting data...")
     lda = LDA(n_components=2)

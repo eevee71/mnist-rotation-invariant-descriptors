@@ -65,9 +65,9 @@ class MomentTransform:
         z = torch.complex(xn, yn)
         z_bar = torch.conj(z)
         z_abs2 = xn**2 + yn**2
-       # gaussian_window = torch.exp(-0.5 * z_abs2)
-        r = torch.sqrt(z_abs2 + 1e-9)
-        gaussian_window = torch.exp(-(r ** 1.5))
+        gaussian_window = torch.exp(-0.5 * z_abs2)
+       # r = torch.sqrt(z_abs2 + 1e-9)
+       # gaussian_window = torch.exp(-(r ** 1.5))
 
         coeffs_list = []
         index = []

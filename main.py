@@ -4,6 +4,7 @@ from src.metrics import classification_metrics
 from src.experiments.supervised import evaluate_qda_in_lda
 from src.visualization import plot_confusion_matrix
 
+CLASS_NUMBER = 10
 
 def main():
 
@@ -11,7 +12,7 @@ def main():
     data, targets = load_data(full_dataset=True)
 
     print("\n=== Supervised Projection (QDA) ===")
-    score_qda, y_true_qda, y_pred_qda = evaluate_qda_in_lda(data, targets)
+    score_qda, y_true_qda, y_pred_qda = evaluate_qda_in_lda(data, targets, k=CLASS_NUMBER)
     classification_metrics(y_true_qda, y_pred_qda)
 
     print("\n=== Generating QDA Confusion Matrix ===")
@@ -20,7 +21,7 @@ def main():
                           save_path="results/qda_confusion_matrix.png")
 
     print("\n=== Training Invariant MLP Classifier ===")
-    mlp_model, y_true_mlp, y_pred_mlp = train_mlp(data, targets, epochs=45, degree=9, k=9)
+    mlp_model, y_true_mlp, y_pred_mlp = train_mlp(data, targets, epochs=60, degree=9, k=CLASS_NUMBER)
     classification_metrics(y_true_mlp, y_pred_mlp)
 
     print("\n=== Generating MLP Confusion Matrix ===")

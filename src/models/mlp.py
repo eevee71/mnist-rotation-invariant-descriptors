@@ -44,7 +44,7 @@ def train_mlp(
     torch.manual_seed(seed)
 
     print(f"\n--- Preparing Data for MLP (degree={degree}, K={k}) ---")
-    Xtr, Xte, ytr, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k, seed=seed)
+    Xtr, Xte, ytr, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k)
 
     scaler = StandardScaler()
     Xtr = scaler.fit_transform(Xtr)

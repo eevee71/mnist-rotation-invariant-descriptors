@@ -7,10 +7,10 @@ from src.dataset_preparation import prepare_pipeline
 from src.experiments.utils import _score
 
 
-def feature_ceiling(data, targets, degree=9, k=9, eval_n=None, seed=0):
+def feature_ceiling(data, targets, degree=9, k=9, eval_n=None):
     """Benchmarks supervised classifiers (kNN, LogReg, QDA) to establish an accuracy ceiling."""
 
-    Xtr, Xte, ytr, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k, eval_n=eval_n, seed=seed)
+    Xtr, Xte, ytr, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k, eval_n=eval_n)
 
     sc = StandardScaler()
     Xtr = sc.fit_transform(Xtr)
@@ -28,13 +28,10 @@ def feature_ceiling(data, targets, degree=9, k=9, eval_n=None, seed=0):
     return dict(knn=acc_knn, logreg=acc_lr, qda=acc_qda)
 
 
-def prepare_lda_subspace(data, targets, degree=9, k=9, eval_n=None, seed=0, test_size=0.3):
+def prepare_lda_subspace(data, targets, degree=9, k=9, eval_n=None):
     """Prepares data, applies feature standardization, and fits the LDA transformation."""
 
-    Xtr, Xte, ytr, yte, _ = prepare_pipeline(
-        data, targets, degree=degree, k=k,
-        eval_n=eval_n, test_size=test_size, seed=seed
-    )
+    Xtr, Xte, ytr, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k, eval_n=eval_n)
     sc = StandardScaler()
     Xtr = sc.fit_transform(Xtr)
     Xte = sc.transform(Xte)
@@ -45,10 +42,7 @@ def prepare_lda_subspace(data, targets, degree=9, k=9, eval_n=None, seed=0, test
     return Ztr, Zte, ytr, yte
 
 
-def evaluate_qda_in_lda(
-        data_or_Ztr, targets_or_Zte, ytr=None, yte=None,
-        degree=9, k=9, eval_n=None, seed=0, test_size=0.3
-):
+def evaluate_qda_in_lda(data_or_Ztr, targets_or_Zte, ytr=None, yte=None, degree=9, k=9, eval_n=None):
     """
     Trains and evaluates QDA in LDA space.
     Accepts either (data, targets) OR precomputed (Ztr, Zte, ytr, yte).
@@ -57,10 +51,7 @@ def evaluate_qda_in_lda(
     if ytr is not None and yte is not None:
         Ztr, Zte = data_or_Ztr, targets_or_Zte
     else:
-        Ztr, Zte, ytr, yte = prepare_lda_subspace(
-            data_or_Ztr, targets_or_Zte, degree=degree, k=k,
-            eval_n=eval_n, seed=seed, test_size=test_size
-        )
+        Ztr, Zte, ytr, yte = prepare_lda_subspace(data_or_Ztr, targets_or_Zte, degree=degree, k=k, eval_n=eval_n)
 
     qda = QuadraticDiscriminantAnalysis().fit(Ztr, ytr)
     y_pred = qda.predict(Zte)
@@ -88,13 +79,10 @@ def evaluate_kmeans_in_lda(Zte, yte, k=9, seed=0):
     return score, yte, y_pred
 
 
-def evaluate_all_in_lda_space(data, targets, degree=9, k=9, eval_n=None, seed=0, test_size=0.3):
+def evaluate_all_in_lda_space(data, targets, degree=9, k=9, eval_n=None, seed=0):
     """Aggregates all LDA-subspace evaluations without redundant LDA re-computations."""
 
-    Ztr, Zte, ytr, yte = prepare_lda_subspace(
-        data, targets, degree=degree, k=k,
-        eval_n=eval_n, seed=seed, test_size=test_size
-    )
+    Ztr, Zte, ytr, yte = prepare_lda_subspace(data, targets, degree=degree, k=k, eval_n=eval_n)
 
     score_nc, _, _ = evaluate_nearest_centroid_in_lda(Ztr, Zte, ytr, yte)
     score_km, _, _ = evaluate_kmeans_in_lda(Zte, yte, k=k, seed=seed)
