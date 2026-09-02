@@ -117,10 +117,11 @@ def run_window_sweep(data, targets, degree=9, k=9, epochs=40, eval_n=5000):
         MomentTransform.complex_coefficients = create_custom_complex_coefficients(win_fn)
 
         try:
-            Xtr, Xte, ytr, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k, eval_n=eval_n)
+            Xtr, Xval, Xte, ytr, yval, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k, eval_n=eval_n)
 
             sc = StandardScaler().fit(Xtr)
             Xtr_s, Xte_s = sc.transform(Xtr), sc.transform(Xte)
+
             qda = QuadraticDiscriminantAnalysis(reg_param=0.01).fit(Xtr_s, ytr)
             qda_acc = (qda.predict(Xte_s) == yte).mean()
 

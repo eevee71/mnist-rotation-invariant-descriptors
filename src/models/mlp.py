@@ -36,6 +36,8 @@ def train_mlp(
         lr: float = 1e-3,
         batch_size: int = 64,
         seed: int = 0,
+        split_seed: int = 42,
+        rot_seed: int = 42,
         log_interval: int = 5,
         device: str = "cuda" if torch.cuda.is_available() else "cpu"
 ):
@@ -44,14 +46,21 @@ def train_mlp(
     torch.manual_seed(seed)
 
     print(f"\n--- Preparing Data for MLP (degree={degree}, K={k}) ---")
-    Xtr, Xte, ytr, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k)
+    Xtr, Xval, Xte, ytr, yval, yte, _ = prepare_pipeline(
+        data, targets, degree=degree, k=k, split_seed=split_seed, rot_seed=rot_seed
+    )
 
     scaler = StandardScaler()
     Xtr = scaler.fit_transform(Xtr)
+    Xval = scaler.transform(Xval)
     Xte = scaler.transform(Xte)
 
     Xtr_t = torch.from_numpy(Xtr).float()
     ytr_t = torch.from_numpy(ytr).long()
+
+    Xval_t = torch.from_numpy(Xval).float().to(device)
+    yval_t = torch.from_numpy(yval).long().to(device)
+
     Xte_t = torch.from_numpy(Xte).float().to(device)
     yte_t = torch.from_numpy(yte).long().to(device)
 
@@ -66,12 +75,11 @@ def train_mlp(
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.AdamW(model.parameters(), lr=lr)
 
-    history = {'train_loss': [], 'test_acc': []}
+    history = {'train_loss': [], 'val_acc': []}
 
-    best_acc = 0.0
+    best_val_acc = 0.0
     best_epoch = 0
     best_model_weights = copy.deepcopy(model.state_dict())
-    best_preds = None
 
     print(f"--- Starting Training ({epochs} epochs, batch_size={batch_size}, device={device}) ---")
     for epoch in range(1, epochs + 1):
@@ -94,24 +102,25 @@ def train_mlp(
 
         model.eval()
         with torch.no_grad():
-            test_preds_tensor = model(Xte_t).argmax(dim=1)
-            test_acc = (test_preds_tensor == yte_t).float().mean().item()
-            history['test_acc'].append(test_acc)
+            val_preds_tensor = model(Xval_t).argmax(dim=1)
+            val_acc = (val_preds_tensor == yval_t).float().mean().item()
+            history['val_acc'].append(val_acc)
 
-            if test_acc > best_acc:
-                best_acc = test_acc
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
                 best_epoch = epoch
                 best_model_weights = copy.deepcopy(model.state_dict())
-                best_preds = test_preds_tensor.cpu().numpy()
 
         if epoch == 1 or epoch % log_interval == 0 or epoch == epochs:
             print(
-                f"Epoch [{epoch:02d}/{epochs:02d}] | Train Loss: {epoch_train_loss:.4f} | Test Acc: {test_acc * 100:.2f}%"
+                f"Epoch [{epoch:02d}/{epochs:02d}] | Train Loss: {epoch_train_loss:.4f} | Val Acc: {val_acc * 100:.2f}%"
             )
-
-    print(f"--- Training Finished. Best Test Accuracy: {best_acc * 100:.2f}% (Achieved at Epoch {best_epoch}) ---")
-
+    print(f"--- Training Finished. Best Val Accuracy: {best_val_acc * 100:.2f}% (Achieved at Epoch {best_epoch}) ---")
     model.load_state_dict(best_model_weights)
+    model.eval()
+    with torch.no_grad():
+        best_preds = model(Xte_t).argmax(dim=1).cpu().numpy()
+
     yte_np = yte_t.cpu().numpy()
 
     return model, yte_np, best_preds

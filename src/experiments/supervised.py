@@ -10,7 +10,7 @@ from src.experiments.utils import _score
 def feature_ceiling(data, targets, degree=9, k=9, eval_n=None):
     """Benchmarks supervised classifiers (kNN, LogReg, QDA) to establish an accuracy ceiling."""
 
-    Xtr, Xte, ytr, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k, eval_n=eval_n)
+    Xtr, Xval, Xte, ytr, yval, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k, eval_n=eval_n)
 
     sc = StandardScaler()
     Xtr = sc.fit_transform(Xtr)
@@ -28,10 +28,12 @@ def feature_ceiling(data, targets, degree=9, k=9, eval_n=None):
     return dict(knn=acc_knn, logreg=acc_lr, qda=acc_qda)
 
 
-def prepare_lda_subspace(data, targets, degree=9, k=9, eval_n=None):
+def prepare_lda_subspace(data, targets, degree=9, k=9, eval_n=None, split_seed=42, rot_seed=42):
     """Prepares data, applies feature standardization, and fits the LDA transformation."""
 
-    Xtr, Xte, ytr, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k, eval_n=eval_n)
+    Xtr, Xval, Xte, ytr, yval, yte, _ = prepare_pipeline(
+        data, targets, degree=degree, k=k, eval_n=eval_n, split_seed=split_seed, rot_seed=rot_seed
+    )
     sc = StandardScaler()
     Xtr = sc.fit_transform(Xtr)
     Xte = sc.transform(Xte)
@@ -42,7 +44,7 @@ def prepare_lda_subspace(data, targets, degree=9, k=9, eval_n=None):
     return Ztr, Zte, ytr, yte
 
 
-def evaluate_qda_in_lda(data_or_Ztr, targets_or_Zte, ytr=None, yte=None, degree=9, k=9, eval_n=None):
+def evaluate_qda_in_lda(data_or_Ztr, targets_or_Zte, ytr=None, yte=None, degree=9, k=9, eval_n=None,  split_seed=42, rot_seed=42):
     """
     Trains and evaluates QDA in LDA space.
     Accepts either (data, targets) OR precomputed (Ztr, Zte, ytr, yte).
@@ -51,7 +53,9 @@ def evaluate_qda_in_lda(data_or_Ztr, targets_or_Zte, ytr=None, yte=None, degree=
     if ytr is not None and yte is not None:
         Ztr, Zte = data_or_Ztr, targets_or_Zte
     else:
-        Ztr, Zte, ytr, yte = prepare_lda_subspace(data_or_Ztr, targets_or_Zte, degree=degree, k=k, eval_n=eval_n)
+        Ztr, Zte, ytr, yte = prepare_lda_subspace(
+            data_or_Ztr, targets_or_Zte, degree=degree, k=k, eval_n=eval_n, split_seed=42, rot_seed=42
+        )
 
     qda = QuadraticDiscriminantAnalysis().fit(Ztr, ytr)
     y_pred = qda.predict(Zte)

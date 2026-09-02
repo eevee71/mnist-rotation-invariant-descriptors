@@ -22,7 +22,7 @@ def main():
 
     print("\n=== Training Invariant MLP Classifier ===")
     mlp_model, y_true_mlp, y_pred_mlp = train_mlp(data, targets, epochs=60, degree=9, k=CLASS_NUMBER)
-    classification_metrics(y_true_mlp, y_pred_mlp)
+    classification_metrics(y_true_mlp, y_pred_mlp) # only test set
 
     print("\n=== Generating MLP Confusion Matrix ===")
     plot_confusion_matrix(y_true=y_true_mlp, y_pred=y_pred_mlp,
