@@ -23,7 +23,16 @@ def get_features(data, targets, degree=9, K=9, eval_n=None):
     return raw, y_m, C, embedder
 
 
-def prepare_pipeline(data, targets, degree=9, k=9, eval_n=None, split_seed=42, rot_seed=42):
+def prepare_pipeline(
+        data,
+        targets,
+        degree=9,
+        k=9,
+        eval_n=None,
+        split_seed=42,
+        rot_seed=42,
+        train_rotated=False
+):
     """Splits raw images, rotates test set, and extracts invariants."""
 
     if eval_n is not None:
@@ -40,15 +49,20 @@ def prepare_pipeline(data, targets, degree=9, k=9, eval_n=None, split_seed=42, r
 
     img_tr, img_val, img_te = data[train_idx], data[val_idx], data[test_idx]
     ytr_raw, yval_raw, yte_raw = y_raw[train_idx], y_raw[val_idx], y_raw[test_idx]
+    ytr_tensor = torch.tensor(ytr_raw)
+    yval_tensor = torch.tensor(yval_raw)
 
     # rotate test images
-    img_te_rot, yte_tensor = rotate_dataset(
-        img_te, torch.tensor(yte_raw), max_angle=180, seed=rot_seed
-    )
+    img_te_rot, yte_tensor = rotate_dataset(img_te, torch.tensor(yte_raw), max_angle=180, seed=rot_seed)
+
+    #with rotated train and valid
+    if train_rotated:
+        img_tr, ytr_tensor = rotate_dataset(img_tr, ytr_tensor, max_angle=180, seed=rot_seed)
+        img_val, yval_tensor = rotate_dataset(img_val, yval_tensor, max_angle=180, seed=rot_seed)
 
     # extract features (invariants)
-    Xtr, ytr, _, embedder = get_features(img_tr, torch.tensor(ytr_raw), degree, k)
-    Xval, yval, _, _ = get_features(img_val, torch.tensor(yval_raw), degree, k)
+    Xtr, ytr, _, embedder = get_features(img_tr, ytr_tensor, degree, k)
+    Xval, yval, _, _ = get_features(img_val, yval_tensor, degree, k)
     Xte, yte, _, _ = get_features(img_te_rot, yte_tensor, degree, k)
 
     return Xtr, Xval, Xte, ytr, yval, yte, embedder

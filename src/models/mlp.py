@@ -39,7 +39,8 @@ def train_mlp(
         split_seed: int = 42,
         rot_seed: int = 42,
         log_interval: int = 5,
-        device: str = "cuda" if torch.cuda.is_available() else "cpu"
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        train_rotated = False
 ):
     """Trains an MLP model on invariants and prints progress."""
 
@@ -47,7 +48,13 @@ def train_mlp(
 
     print(f"\n--- Preparing Data for MLP (degree={degree}, K={k}) ---")
     Xtr, Xval, Xte, ytr, yval, yte, _ = prepare_pipeline(
-        data, targets, degree=degree, k=k, split_seed=split_seed, rot_seed=rot_seed
+        data=data,
+        targets=targets,
+        degree=degree,
+        k=k,
+        split_seed=split_seed,
+        rot_seed=rot_seed,
+        train_rotated=train_rotated
     )
 
     scaler = StandardScaler()
