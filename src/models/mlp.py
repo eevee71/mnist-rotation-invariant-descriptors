@@ -40,22 +40,19 @@ def train_mlp(
         rot_seed: int = 42,
         log_interval: int = 5,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
-        train_rotated = False
+        official_rot = False,
+        data_rot = None,
+        targets_rot = None
 ):
     """Trains an MLP model on invariants and prints progress."""
 
     torch.manual_seed(seed)
 
     print(f"\n--- Preparing Data for MLP (degree={degree}, K={k}) ---")
-    Xtr, Xval, Xte, ytr, yval, yte, _ = prepare_pipeline(
-        data=data,
-        targets=targets,
-        degree=degree,
-        k=k,
-        split_seed=split_seed,
-        rot_seed=rot_seed,
-        train_rotated=train_rotated
-    )
+    Xtr, Xval, Xte, ytr, yval, yte, _ = prepare_pipeline(data=data, targets=targets, degree=degree, k=k,
+                                                         split_seed=split_seed, rot_seed=rot_seed,
+                                                         official_rot=official_rot, data_rot=data_rot,
+                                                         targets_rot=targets_rot)
 
     scaler = StandardScaler()
     Xtr = scaler.fit_transform(Xtr)

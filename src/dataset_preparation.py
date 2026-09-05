@@ -1,5 +1,4 @@
 import numpy as np
-import torch
 from data.dataloader import rotate_dataset
 from src.embedder import Embedder
 from src.metrics import merge_labels
@@ -31,36 +30,43 @@ def prepare_pipeline(
         eval_n=None,
         split_seed=42,
         rot_seed=42,
-        train_rotated=False
+        official_rot=False,
+        data_rot=None,
+        targets_rot=None
 ):
-    """Splits raw images, rotates test set, and extracts invariants."""
+    """Splits raw images, rotates test set, and extracts invariants.
+
+    - (official_rot=True): Uses the official MNIST-Rot dataset for all splits
+                            (train, val, and test are completely pre-rotated).
+    - (official_rot=False): Uses unrotated MNIST-12k for train/val
+                            and dynamically rotates only the test set.
+    """
 
     if eval_n is not None:
         data, targets = data[:eval_n], targets[:eval_n]
+        if official_rot and data_rot is not None:
+            data_rot, targets_rot = data_rot[:eval_n], targets_rot[:eval_n]
 
-    y_raw = targets.cpu().numpy()
     np.random.seed(split_seed)
-    idx = np.random.permutation(len(data))
 
-    # 10k train, 2k val, 50k test
-    train_idx = idx[:10000]
-    val_idx = idx[10000:12000]
-    test_idx = idx[12000:62000]
+    perm_train_val = np.random.permutation(12000)
+    perm_test = 12000 + np.random.permutation(50000)
 
-    img_tr, img_val, img_te = data[train_idx], data[val_idx], data[test_idx]
-    ytr_raw, yval_raw, yte_raw = y_raw[train_idx], y_raw[val_idx], y_raw[test_idx]
-    ytr_tensor = torch.tensor(ytr_raw)
-    yval_tensor = torch.tensor(yval_raw)
+    train_idx = perm_train_val[:10000]
+    val_idx = perm_train_val[10000:12000]
+    test_idx = perm_test
 
-    # rotate test images
-    img_te_rot, yte_tensor = rotate_dataset(img_te, torch.tensor(yte_raw), max_angle=180, seed=rot_seed)
+    if official_rot:
+        img_tr, ytr_tensor = data_rot[train_idx], targets_rot[train_idx]
+        img_val, yval_tensor = data_rot[val_idx], targets_rot[val_idx]
+        img_te_rot, yte_tensor = data_rot[test_idx], targets_rot[test_idx]
+    else:
+        img_tr, ytr_tensor = data[train_idx], targets[train_idx]
+        img_val, yval_tensor = data[val_idx], targets[val_idx]
+        img_te, yte_tensor = data[test_idx], targets[test_idx]
 
-    #with rotated train and valid
-    if train_rotated:
-        img_tr, ytr_tensor = rotate_dataset(img_tr, ytr_tensor, max_angle=180, seed=rot_seed)
-        img_val, yval_tensor = rotate_dataset(img_val, yval_tensor, max_angle=180, seed=rot_seed)
+        img_te_rot, yte_tensor = rotate_dataset(img_te, yte_tensor, max_angle=180, seed=rot_seed)
 
-    # extract features (invariants)
     Xtr, ytr, _, embedder = get_features(img_tr, ytr_tensor, degree, k)
     Xval, yval, _, _ = get_features(img_val, yval_tensor, degree, k)
     Xte, yte, _, _ = get_features(img_te_rot, yte_tensor, degree, k)

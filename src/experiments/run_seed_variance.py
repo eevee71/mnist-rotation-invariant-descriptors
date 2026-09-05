@@ -1,25 +1,33 @@
 import numpy as np
 from sklearn.metrics import accuracy_score
-from data.dataloader import load_data
+from data.dataloader import load_data, load_mnist_rot
 from src.experiments.supervised import evaluate_qda_in_lda
 from src.models.mlp import train_mlp
 
 
-def run_seed_variance(train_rotated=True):
+def run_seed_variance(
+        data,
+        targets,
+        official_rot=False,
+        data_rot=None,
+        targets_rot=None
+):
+    """Evaluates QDA and MLP across multiple random seeds."""
     seeds = [42, 100, 2026, 7, 999, 13, 88, 123, 456, 789]
     qda_accs = []
     mlp_accs = []
-
-    data, targets = load_data(full_dataset=True)
     class_num = 10
 
+    mode_name = "MNIST-Rot" if official_rot else "MNIST-12k (unrotated train and dynamic test rot)"
+
     for i, s in enumerate(seeds, 1):
-        print(f"\n--- Run [{i}/10] (Seed: {s}, Train Rotated: {train_rotated}) ---")
+        print(f"\n--- Run [{i}/10] (Seed: {s}, Mode: {mode_name}) ---")
 
         # QDA evaluation
         _, y_true_qda, y_pred_qda = evaluate_qda_in_lda(
             data, targets, degree=9, k=class_num,
-            split_seed=s, rot_seed=s, train_rotated=train_rotated
+            split_seed=s, rot_seed=s,
+            official_rot=official_rot, data_rot=data_rot, targets_rot=targets_rot
         )
         qda_acc = accuracy_score(y_true_qda, y_pred_qda) * 100
         qda_accs.append(qda_acc)
@@ -27,13 +35,14 @@ def run_seed_variance(train_rotated=True):
         # MLP evaluation
         _, y_true_mlp, y_pred_mlp = train_mlp(
             data, targets, degree=9, k=class_num, epochs=30,
-            seed=s, split_seed=s, rot_seed=s, train_rotated=train_rotated
+            seed=s, split_seed=s, rot_seed=s,
+            official_rot=official_rot, data_rot=data_rot, targets_rot=targets_rot
         )
         mlp_acc = accuracy_score(y_true_mlp, y_pred_mlp) * 100
         mlp_accs.append(mlp_acc)
 
     print("\n" + "=" * 50)
-    print(f"SUMMARY (Train Rotated: {train_rotated})")
+    print(f"SUMMARY (Mode: {mode_name})")
     print("=" * 50)
     print(f"QDA Mean Accuracy: {np.mean(qda_accs):.2f}% (± {np.std(qda_accs):.2f}%)")
     print(f"MLP Mean Accuracy: {np.mean(mlp_accs):.2f}% (± {np.std(mlp_accs):.2f}%)")
@@ -41,5 +50,17 @@ def run_seed_variance(train_rotated=True):
 
 
 if __name__ == "__main__":
-    run_seed_variance(train_rotated=False)
-    run_seed_variance(train_rotated=True)
+    data, targets = load_data()
+    data_rot, targets_rot = load_mnist_rot()
+
+    # Unrotated Train + Dynamic Test Rotation
+    run_seed_variance(
+        data, targets,
+        official_rot=False
+    )
+
+    # MNIST-Rot (Train and Test fully rotated)
+    run_seed_variance(
+        data, targets,
+        official_rot=True, data_rot=data_rot, targets_rot=targets_rot
+    )

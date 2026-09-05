@@ -1,44 +1,51 @@
 from pathlib import Path
+
+import numpy as np
 import torch
-from torchvision import datasets
 import torchvision.transforms.v2.functional as TVF
 
 
-def load_MNIST(train=True, transform=None):
-    """Downloads and loads the MNIST dataset as float Tensors normalized to [0, 1]."""
+def _load_amat_pair(train_filename, test_filename):
+    """Helper to parse a pair of Larochelle .amat files into combined Tensors."""
 
-    project_root = Path(__file__).resolve().parents[1]
-    data_dir = project_root / "data"
-    dataset = datasets.MNIST(root=str(data_dir), train=train, download=True)
-    data = dataset.data.float() / 255.0
-    targets = dataset.targets
+    data_dir = Path(__file__).resolve().parents[1] / "data"
 
-    if transform is not None:
-        data, targets = transform(data, targets)
+    train_val = np.loadtxt(data_dir / train_filename)
+    test = np.loadtxt(data_dir / test_filename)
 
-    print(f"data loaded")
-    print(f"data: {data.shape}")
-    print(f"targets {targets.shape}")
+    full_data = np.vstack((train_val, test))
+    images = full_data[:, :-1].reshape(-1, 28, 28)
+    targets = full_data[:, -1]
+
+    return torch.tensor(images, dtype=torch.float32), torch.tensor(targets, dtype=torch.long)
+
+
+def load_data():
+    """Loads the unrotated Larochelle MNIST-12k dataset."""
+
+    print("Loading official MNIST-12k dataset...")
+    data, targets = _load_amat_pair(
+        "mnist_train.amat",
+        "mnist_test.amat"
+    )
+    print(f"data: {data.shape}, targets: {targets.shape}")
     return data, targets
 
 
-def load_data(full_dataset=True):
-    """Wrapper function, loads both train and test sets
-    combined into one Tensor if full_dataset=True."""
+def load_mnist_rot():
+    """Loads the official Larochelle MNIST-Rot dataset."""
 
-    if full_dataset:
-        data_tr, targets_tr = load_MNIST(train=True)
-        data_te, targets_te = load_MNIST(train=False)
-        data = torch.cat([data_tr, data_te], dim=0)
-        targets = torch.cat([targets_tr, targets_te], dim=0)
-        return data, targets
-    else:
-        return load_MNIST(train=True)
+    print("Loading MNIST-Rot dataset...")
+    data_rot, targets_rot = _load_amat_pair(
+        "mnist_all_rotation_normalized_float_train_valid.amat",
+        "mnist_all_rotation_normalized_float_test.amat"
+    )
+    print(f"data_rot: {data_rot.shape}, targets_rot: {targets_rot.shape}")
+    return data_rot, targets_rot
 
 
 def rotate_dataset(data, targets, max_angle=180, seed=None):
     """Rotates the dataset by random angles within [-max_angle, max_angle].
-    Use `seed` to ensure the test set rotation is reproducible.
     """
 
     if seed is not None:

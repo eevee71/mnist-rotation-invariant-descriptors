@@ -180,5 +180,5 @@ def print_results_table(results):
 
 
 if __name__ == "__main__":
-    data, targets = load_data(full_dataset=True)
+    data, targets = load_data()
     run_window_sweep(data, targets, degree=9, k=9, epochs=60, eval_n=5000)

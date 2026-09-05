@@ -9,7 +9,7 @@ CLASS_NUMBER = 10
 def main():
 
     print("=== Loading Dataset ===")
-    data, targets = load_data(full_dataset=True)
+    data, targets = load_data()
 
     print("\n=== Supervised Projection (QDA) ===")
     score_qda, y_true_qda, y_pred_qda = evaluate_qda_in_lda(data, targets, k=CLASS_NUMBER)

@@ -7,11 +7,21 @@ from src.dataset_preparation import prepare_pipeline
 from src.experiments.utils import _score
 
 
-def feature_ceiling(data, targets, degree=9, k=9, eval_n=None):
+def feature_ceiling(
+        data,
+        targets,
+        degree=9,
+        k=9,
+        eval_n=None,
+        official_rot=False,
+        data_rot=None,
+        targets_rot=None
+):
     """Benchmarks supervised classifiers (kNN, LogReg, QDA) to establish an accuracy ceiling."""
 
-    Xtr, Xval, Xte, ytr, yval, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k, eval_n=eval_n)
-
+    Xtr, Xval, Xte, ytr, yval, yte, _ = prepare_pipeline(data, targets, degree=degree, k=k, eval_n=eval_n,
+                                                         official_rot=official_rot, data_rot=data_rot,
+                                                         targets_rot=targets_rot)
     sc = StandardScaler()
     Xtr = sc.fit_transform(Xtr)
     Xte = sc.transform(Xte)
@@ -28,19 +38,24 @@ def feature_ceiling(data, targets, degree=9, k=9, eval_n=None):
     return dict(knn=acc_knn, logreg=acc_lr, qda=acc_qda)
 
 
-def prepare_lda_subspace(data, targets, degree=9, k=9, eval_n=None, split_seed=42, rot_seed=42, train_rotated=False):
+def prepare_lda_subspace(
+        data,
+        targets,
+        degree=9,
+        k=9,
+        eval_n=None,
+        split_seed=42,
+        rot_seed=42,
+        official_rot=False,
+        data_rot=None,
+        targets_rot=None
+):
     """Prepares data, applies feature standardization, and fits the LDA transformation."""
 
-    Xtr, Xval, Xte, ytr, yval, yte, _ = prepare_pipeline(
-        data=data,
-        targets=targets,
-        degree=degree,
-        k=k,
-        eval_n=eval_n,
-        split_seed=split_seed,
-        rot_seed=rot_seed,
-        train_rotated=train_rotated
-    )
+    Xtr, Xval, Xte, ytr, yval, yte, _ = prepare_pipeline(data=data, targets=targets, degree=degree, k=k, eval_n=eval_n,
+                                                         split_seed=split_seed, rot_seed=rot_seed,
+                                                         official_rot=official_rot, data_rot=data_rot,
+                                                         targets_rot=targets_rot)
     sc = StandardScaler()
     Xtr = sc.fit_transform(Xtr)
     Xte = sc.transform(Xte)
@@ -54,13 +69,17 @@ def prepare_lda_subspace(data, targets, degree=9, k=9, eval_n=None, split_seed=4
 def evaluate_qda_in_lda(
         data_or_Ztr,
         targets_or_Zte,
-        ytr=None, yte=None,
+        ytr=None,
+        yte=None,
         degree=9,
         k=9,
         eval_n=None,
         split_seed=42,
         rot_seed=42,
-        train_rotated=False):
+        official_rot=False,
+        data_rot=None,
+        targets_rot=None
+):
     """
     Trains and evaluates QDA in LDA space.
     Accepts either (data, targets) OR precomputed (Ztr, Zte, ytr, yte).
@@ -70,14 +89,9 @@ def evaluate_qda_in_lda(
         Ztr, Zte = data_or_Ztr, targets_or_Zte
     else:
         Ztr, Zte, ytr, yte = prepare_lda_subspace(
-            data=data_or_Ztr,
-            targets=targets_or_Zte,
-            degree=degree,
-            k=k,
-            eval_n=eval_n,
-            split_seed=split_seed,
-            rot_seed=rot_seed,
-            train_rotated=train_rotated
+            data=data_or_Ztr, targets=targets_or_Zte, degree=degree, k=k,
+            eval_n=eval_n, split_seed=split_seed, rot_seed=rot_seed,
+            official_rot=official_rot, data_rot=data_rot, targets_rot=targets_rot
         )
 
     qda = QuadraticDiscriminantAnalysis().fit(Ztr, ytr)
@@ -106,16 +120,22 @@ def evaluate_kmeans_in_lda(Zte, yte, k=9, seed=0):
     return score, yte, y_pred
 
 
-def evaluate_all_in_lda_space(data, targets, degree=9, k=9, eval_n=None, seed=0, train_rotated=False):
+def evaluate_all_in_lda_space(
+        data,
+        targets,
+        degree=9,
+        k=9,
+        eval_n=None,
+        seed=0,
+        official_rot=False,
+        data_rot=None,
+        targets_rot=None
+):
     """Aggregates all LDA-subspace evaluations without redundant LDA re-computations."""
 
     Ztr, Zte, ytr, yte = prepare_lda_subspace(
-        data=data,
-        targets=targets,
-        degree=degree,
-        k=k,
-        eval_n=eval_n,
-        train_rotated=train_rotated
+        data=data, targets=targets, degree=degree, k=k, eval_n=eval_n,
+        official_rot=official_rot, data_rot=data_rot, targets_rot=targets_rot
     )
 
     score_nc, _, _ = evaluate_nearest_centroid_in_lda(Ztr=Ztr, Zte=Zte, ytr=ytr, yte=yte)

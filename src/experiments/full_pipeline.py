@@ -12,7 +12,7 @@ from src.experiments.window_sweep import run_window_sweep
 
 def run_full_experiments():
     print("=== Loading Dataset ===")
-    data, targets = load_data(full_dataset=True)
+    data, targets = load_data()
 
     print("\n=== Supervised Benchmarks (Feature Ceiling) ===")
     feature_ceiling(data, targets, degree=9, k=9)
