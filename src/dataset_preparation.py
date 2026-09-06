@@ -1,6 +1,7 @@
 import numpy as np
 from data.dataloader import rotate_dataset
 from src.embedder import Embedder
+import torchvision.transforms.v2.functional as TVF
 from src.metrics import merge_labels
 
 
@@ -65,9 +66,14 @@ def prepare_pipeline(
         img_tr, ytr_tensor = data[train_idx], targets[train_idx]
         img_val, yval_tensor = data[val_idx], targets[val_idx]
 
+
         # Uses official rotated test set if data_rot is provided, falls back to dynamic rotation otherwise
         if data_rot is not None:
             img_te_rot, yte_tensor = data_rot[test_idx], targets_rot[test_idx]
+            # Transpose spatial dimensions to fix axis orientation discrepancies
+            # between the unrotated MNIST-12k grid and the pre-rotated MNIST-Rot dataset
+            # from Hugo Larochelle's benchmark repository.
+            img_te_rot = img_te_rot.transpose(1, 2)
         else:
             img_te, yte_tensor = data[test_idx], targets[test_idx]
             img_te_rot, yte_tensor = rotate_dataset(img_te, yte_tensor, max_angle=180, seed=rot_seed)

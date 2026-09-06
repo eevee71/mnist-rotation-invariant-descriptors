@@ -1,8 +1,7 @@
 from pathlib import Path
-
-import numpy as np
 import torch
 import torchvision.transforms.v2.functional as TVF
+import numpy as np
 
 
 def _load_amat_pair(train_filename, test_filename):
@@ -20,7 +19,7 @@ def _load_amat_pair(train_filename, test_filename):
     return torch.tensor(images, dtype=torch.float32), torch.tensor(targets, dtype=torch.long)
 
 
-def load_data():
+def load_data(threshold=0.05):
     """Loads the unrotated Larochelle MNIST-12k dataset."""
 
     print("Loading official MNIST-12k dataset...")
@@ -32,7 +31,7 @@ def load_data():
     return data, targets
 
 
-def load_mnist_rot():
+def load_mnist_rot(threshold=0.05):
     """Loads the official Larochelle MNIST-Rot dataset."""
 
     print("Loading MNIST-Rot dataset...")

@@ -12,12 +12,14 @@ from src.models.mlp import train_mlp
     and applying dynamic in-code rotations to the test set.
 """
 
+
 def run_seed_variance(
         data,
         targets,
         official_rot=False,
         data_rot=None,
-        targets_rot=None
+        targets_rot=None,
+        use_base_mnist=False
 ):
     """Evaluates QDA and MLP across multiple random seeds."""
     seeds = [42, 100, 2026, 7, 999, 13, 88, 123, 456, 789]
@@ -25,7 +27,9 @@ def run_seed_variance(
     mlp_accs = []
     class_num = 10
 
-    if official_rot:
+    if use_base_mnist:
+        mode_name = "Base MNIST Train (10k unrotated) + Official MNIST-Rot Test"
+    elif official_rot:
         mode_name = "MNIST-Rot (fully rotated train and test)"
     elif data_rot is not None:
         mode_name = "MNIST-12k (unrotated train, official MNIST-Rot test)"
@@ -66,6 +70,8 @@ if __name__ == "__main__":
     data_rot, targets_rot = load_mnist_rot()
 
     # Unrotated Train (MNIST-12k) + Official Rotated Test (MNIST-Rot)
+    # Relies on data_rot internally being transposed (via dataset_preparation.prepare_pipeline)
+    # to align spatial axes between the unrotated MNIST-12k grid and the pre-rotated MNIST-Rot dataset.
     run_seed_variance(
         data, targets,
         official_rot=False, data_rot=data_rot, targets_rot=targets_rot
