@@ -24,18 +24,15 @@ To ensure proper alignment between the unrotated grid and the pre-rotated datase
 3. **Dynamic Test Rotation:** All subsets (training, validation, and testing) are sourced from the MNIST12K, but random rotations ($[-\pi, \pi]$) are dynamically applied to the test images.
 Each setup is evaluated across 10 independent runs using different random seeds for the training and validation splits.
 
-## Repository Structure & Key Files
+## Repository Structure
 
-* **`main.py`**  
+* **`main.py`** 
 Executes the core benchmark (training on MNIST12k, testing on MNIST-Rot) and saves the resulting QDA and MLP confusion matrices as `.png` files to the `results/` directory.
 
-* **`quad_moments.py`**  
-Implements a `QuadMomentTransform` that computes exact integrals over pixel squares using tensor Gauss-Legendre quadrature.
-
-* **`src/experiments/`**  
+* **`src/experiments/`**  ([src README](src/README.md))  
 Contains experimental setups and scripts ([experiments README](src/experiments/README.md)).
 
-* **`src/models/mlp.py`**  
+* **`src/models/mlp.py`** ([src README](src/README.md))  
 Contains the PyTorch implementation of the Invariant MLP classifier.
 
 * **`data/`**  
