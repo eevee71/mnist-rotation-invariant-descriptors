@@ -25,4 +25,4 @@ Generates and saves visual analyses.
 Contains the implementation of the Invariant MLP classifier (`mlp.py`).
 
 * **`experiments/`**  
-Contains dedicated scripts and setups for running systematic evaluations, seed variance tests, and supervised benchmarks.
+Contains dedicated scripts and setups for running systematic evaluations, seed variance tests and supervised benchmarks. ([experiments README](experiments/README.md))

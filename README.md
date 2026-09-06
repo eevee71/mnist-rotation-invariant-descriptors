@@ -26,7 +26,7 @@ Each setup is evaluated across 10 independent runs using different random seeds 
 
 ## Repository Structure
 
-* **`main.py`** 
+* **`main.py`**   
 Executes the core benchmark (training on MNIST12k, testing on MNIST-Rot) and saves the resulting QDA and MLP confusion matrices as `.png` files to the `results/` directory.
 
 * **`src/experiments/`**  ([src README](src/README.md))  
