@@ -4,6 +4,13 @@ from data.dataloader import load_data, load_mnist_rot
 from src.experiments.supervised import evaluate_qda_in_lda
 from src.models.mlp import train_mlp
 
+"""
+1.Unrotated Train + Official Rotated Test: Replicates Section 5.2 of Sangalli et al. by testing `MNIST-12k`-trained models against 
+    official pre-rotated `.amat` test files to assess robustness to interpolation artifacts.
+2.Full Official MNIST-Rot: Standard benchmark evaluation where both training and test sets use official pre-rotated `.amat` files.
+3.Dynamic Test Rotation: Evaluates exact SO(2) invariance by training on unrotated `MNIST-12k` 
+    and applying dynamic in-code rotations to the test set.
+"""
 
 def run_seed_variance(
         data,
@@ -68,4 +75,10 @@ if __name__ == "__main__":
     run_seed_variance(
         data, targets,
         official_rot=True, data_rot=data_rot, targets_rot=targets_rot
+    )
+
+    # Dynamic test rotation (Train (MNIST-12k) + Dynamic Rotated Test ((MNIST-12k)) ---
+    run_seed_variance(
+        data, targets,
+        official_rot=False, data_rot=None, targets_rot=None
     )
