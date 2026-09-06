@@ -1,4 +1,4 @@
-from data.dataloader import load_data
+from data.dataloader import load_data, load_mnist_rot
 from src.models.mlp import train_mlp
 from src.metrics import classification_metrics
 from src.experiments.supervised import evaluate_qda_in_lda
@@ -10,9 +10,13 @@ def main():
 
     print("=== Loading Dataset ===")
     data, targets = load_data()
+    data_rot, targets_rot = load_mnist_rot()
 
     print("\n=== Supervised Projection (QDA) ===")
-    score_qda, y_true_qda, y_pred_qda = evaluate_qda_in_lda(data, targets, k=CLASS_NUMBER)
+    score_qda, y_true_qda, y_pred_qda = evaluate_qda_in_lda(data, targets, k=CLASS_NUMBER,
+                                                            official_rot=False, data_rot=data_rot,
+                                                            targets_rot=targets_rot
+                                                            )
     classification_metrics(y_true_qda, y_pred_qda)
 
     print("\n=== Generating QDA Confusion Matrix ===")
@@ -21,7 +25,9 @@ def main():
                           save_path="results/qda_confusion_matrix.png")
 
     print("\n=== Training Invariant MLP Classifier ===")
-    mlp_model, y_true_mlp, y_pred_mlp = train_mlp(data, targets, epochs=60, degree=9, k=CLASS_NUMBER)
+    mlp_model, y_true_mlp, y_pred_mlp = train_mlp(data, targets, epochs=60, degree=9, k=CLASS_NUMBER,
+                                                  official_rot=False, data_rot=data_rot, targets_rot=targets_rot
+                                                  )
     classification_metrics(y_true_mlp, y_pred_mlp) # only test set
 
     print("\n=== Generating MLP Confusion Matrix ===")
