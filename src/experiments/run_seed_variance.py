@@ -18,7 +18,12 @@ def run_seed_variance(
     mlp_accs = []
     class_num = 10
 
-    mode_name = "MNIST-Rot" if official_rot else "MNIST-12k (unrotated train and dynamic test rot)"
+    if official_rot:
+        mode_name = "MNIST-Rot (fully rotated train and test)"
+    elif data_rot is not None:
+        mode_name = "MNIST-12k (unrotated train, official MNIST-Rot test)"
+    else:
+        mode_name = "MNIST-12k (unrotated train, dynamic test rot)"
 
     for i, s in enumerate(seeds, 1):
         print(f"\n--- Run [{i}/10] (Seed: {s}, Mode: {mode_name}) ---")
@@ -53,10 +58,10 @@ if __name__ == "__main__":
     data, targets = load_data()
     data_rot, targets_rot = load_mnist_rot()
 
-    # Unrotated Train + Dynamic Test Rotation
+    # Unrotated Train (MNIST-12k) + Official Rotated Test (MNIST-Rot)
     run_seed_variance(
         data, targets,
-        official_rot=False
+        official_rot=False, data_rot=data_rot, targets_rot=targets_rot
     )
 
     # MNIST-Rot (Train and Test fully rotated)

@@ -34,17 +34,18 @@ def prepare_pipeline(
         data_rot=None,
         targets_rot=None
 ):
-    """Splits raw images, rotates test set, and extracts invariants.
+    """Splits raw images, applies dataset rotation, and extracts invariants.
 
-    - (official_rot=True): Uses the official MNIST-Rot dataset for all splits
+    - (official_rot=True): Uses the official pre-rotated MNIST-Rot dataset for all splits
                             (train, val, and test are completely pre-rotated).
-    - (official_rot=False): Uses unrotated MNIST-12k for train/val
-                            and dynamically rotates only the test set.
+    - (official_rot=False): Uses unrotated MNIST-12k for train/val.
+                            If data_rot is provided, uses official pre-rotated test set;
+                            otherwise, dynamically rotates the test set using rot_seed.
     """
 
     if eval_n is not None:
         data, targets = data[:eval_n], targets[:eval_n]
-        if official_rot and data_rot is not None:
+        if data_rot is not None:
             data_rot, targets_rot = data_rot[:eval_n], targets_rot[:eval_n]
 
     np.random.seed(split_seed)
@@ -63,9 +64,13 @@ def prepare_pipeline(
     else:
         img_tr, ytr_tensor = data[train_idx], targets[train_idx]
         img_val, yval_tensor = data[val_idx], targets[val_idx]
-        img_te, yte_tensor = data[test_idx], targets[test_idx]
 
-        img_te_rot, yte_tensor = rotate_dataset(img_te, yte_tensor, max_angle=180, seed=rot_seed)
+        # Uses official rotated test set if data_rot is provided, falls back to dynamic rotation otherwise
+        if data_rot is not None:
+            img_te_rot, yte_tensor = data_rot[test_idx], targets_rot[test_idx]
+        else:
+            img_te, yte_tensor = data[test_idx], targets[test_idx]
+            img_te_rot, yte_tensor = rotate_dataset(img_te, yte_tensor, max_angle=180, seed=rot_seed)
 
     Xtr, ytr, _, embedder = get_features(img_tr, ytr_tensor, degree, k)
     Xval, yval, _, _ = get_features(img_val, yval_tensor, degree, k)
