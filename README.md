@@ -2,6 +2,7 @@
 
 This repository contains the code for our research on **Rotation-Invariant MNIST Classification Using Itô-Hermite Polynomials**. We use these polynomial functions to approximate images and extract rotation-invariant descriptors, evaluating the approach on the MNIST12K and MNIST-Rot datasets.
 
+We benchmark our approach by reproducing the experiments from [*Differential Invariants for SE(2)-Equivariant Networks*](https://arxiv.org/abs/2206.13279) (Sangalli et al., 2022).
 ## Overview
 Rather than relying on computationally heavy architectures, this project demonstrates that rotation-invariant digit classification can be achieved using a streamlined, mathematically grounded approach. 
 We approximate images using polynomial functions to extract invariant features, which are then passed to lightweight learning models such as QDA and MLP. The method provides robust performance on rotated benchmarks while remaining highly efficient.

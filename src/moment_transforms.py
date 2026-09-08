@@ -1,10 +1,14 @@
 import math
 import torch
 class MomentTransform:
+
     def __init__(self, max_degree=6, spatial_dimensions=2):
         self.max_degree = max_degree
         self.spatial_dimensions = spatial_dimensions
+
+
     def prepare_density_center(self, images):
+
         normalized = images / (images.sum(dim=(-2, -1), keepdim=True) + 1e-9)
         rows, cols = images.shape[-2], images.shape[-1]
         y_grid, x_grid = torch.meshgrid(
@@ -17,7 +21,10 @@ class MomentTransform:
         x_centered = x_grid - (normalized * x_grid).sum(dim=(-2, -1), keepdim=True)
         y_centered = y_grid - (normalized * y_grid).sum(dim=(-2, -1), keepdim=True)
         return normalized, x_centered, y_centered
+
+
     def covariance_invariants(self, density_map, x, y):
+
         p_xx = (density_map * x * x).sum(dim=(-2, -1))
         p_yy = (density_map * y * y).sum(dim=(-2, -1))
         p_xy = (density_map * x * y).sum(dim=(-2, -1))
@@ -31,13 +38,19 @@ class MomentTransform:
         trace_p1 = torch.diagonal(p, dim1=-2, dim2=-1).sum(dim=-1)
         trace_p2 = torch.diagonal(torch.matmul(p, p), dim1=-2, dim2=-1).sum(dim=-1)
         return torch.stack([trace_p1, trace_p2], dim=-1)
+
+
     def normalization(self, x, y, trace):
+
         scale = torch.sqrt(trace / 3).view(-1, 1, 1)
         return x / scale, y / scale
+
+
     def complex_coefficients(self, images):
         """Extracts complex Hermite coefficients row-by-row via the three-term recurrences
             H_{0,n} = conj(z)**n,   H_{m,n} = z * H_{m-1,n} - n * H_{m-1,n-1}
         """
+
         dm, xc, yc = self.prepare_density_center(images)
         trace = self.covariance_invariants(dm, xc, yc)[:, 0]
         xn, yn = self.normalization(xc, yc, trace)
